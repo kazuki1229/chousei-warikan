@@ -534,28 +534,49 @@ export default function ExpenseSplitting() {
           </CardHeader>
           <CardContent>
             {settlements && settlements.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <div className="p-3 rounded-md border-l-4 border-blue-500 bg-blue-50">
+                  <p className="text-sm text-blue-700 font-medium">
+                    この精算方法で、すべての支払いが最小限の取引で相殺されます。
+                  </p>
+                </div>
+                
                 {settlements.map((settlement, index) => (
                   <div 
                     key={index} 
-                    className="p-3 rounded-md border border-green-200 bg-green-50"
+                    className="p-4 rounded-md border border-green-200 bg-green-50 shadow-sm"
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-sm">{settlement.from}</p>
-                      <ArrowLeftRight className="h-4 w-4 text-green-600 mx-2" />
-                      <p className="text-sm">{settlement.to}</p>
+                      <div className="font-medium">{settlement.from}</div>
+                      <div className="flex items-center">
+                        <ArrowRight className="h-5 w-5 text-green-600 mx-2" />
+                      </div>
+                      <div className="font-medium">{settlement.to}</div>
                     </div>
-                    <div className="mt-1 font-medium text-right text-green-700">
-                      {formatCurrency(settlement.amount)} 支払う
+                    <div className="mt-2 text-center">
+                      <span className="text-lg font-bold text-green-700">
+                        {formatCurrency(settlement.amount)}
+                      </span>
+                      <span className="ml-1 text-green-700">支払う</span>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : expenses && expenses.length > 0 ? (
+            ) : expenses && expenses.length > 1 ? (
               <div className="text-center p-6">
-                <p className="text-slate-500">
-                  複数の参加者による支払いがあると、最適な精算方法が表示されます。
-                </p>
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 mb-4">
+                  <p className="text-amber-700">
+                    参加者間の貸し借りがすべて相殺されているため、精算は不要です。
+                  </p>
+                </div>
+              </div>
+            ) : expenses && expenses.length === 1 ? (
+              <div className="text-center p-6">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 mb-4">
+                  <p className="text-amber-700">
+                    複数の支払いが記録されると、精算方法が表示されます。
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="text-center p-8 text-slate-500">
