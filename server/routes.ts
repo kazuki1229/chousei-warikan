@@ -301,58 +301,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expenses = await storage.getEventExpenses(req.params.id);
       
       console.log("▶ 割り勘計算ロジックを実行...");
-      // 特別なテストケース処理
-      if (expenses.length === 2) {
-        // 金額で検出
-        const expenseA = expenses.find(e => Number(e.amount) === 3000);
-        const expenseB = expenses.find(e => Number(e.amount) === 1200);
-        
-        if (expenseA && expenseB) {
-          console.log("▶ テストケース検出：3000円と1200円の支払いパターン");
-          
-          const A = expenseA.payerName;
-          const B = expenseB.payerName;
-          
-          // 参加者を全て収集 (支払者と明示的に指定された参加者)
-          const allParticipantsSet = new Set<string>();
-          expenses.forEach(e => {
-            allParticipantsSet.add(e.payerName);
-            if (e.participants && e.participants.length > 0) {
-              e.participants.forEach(p => allParticipantsSet.add(p));
-            }
-          });
-          
-          const allParticipants = Array.from(allParticipantsSet);
-          
-          console.log(`▶ 検出された参加者: ${allParticipants.join(', ')}`);
-          
-          // 3人参加者がいる場合 = A,B,C のケース
-          if (allParticipants.length === 3) {
-            const C = allParticipants.find(p => p !== A && p !== B);
-            
-            if (C) {
-              console.log(`▶ 特別ケース確定: A=${A}, B=${B}, C=${C}`);
-              console.log(`▶ テストケースの精算結果: B→A: 400円, C→A: 1000円`);
-              
-              return res.json([
-                { from: B, to: A, amount: 400 },
-                { from: C, to: A, amount: 1000 }
-              ]);
-            }
-          }
-          
-          // 2人だけの場合 = A,B のみのケース
-          else if (allParticipants.length === 2) {
-            console.log(`▶ 2人ケース確定: A=${A}, B=${B}`);
-            console.log(`▶ 精算結果: B→A: 900円`);
-            
-            // テストケースの正しい精算結果
-            return res.json([
-              { from: B, to: A, amount: 900 }
-            ]);
-          }
-        }
-      }
       
       // 通常の計算
       const settlements = calculateSettlements(expenses);
@@ -372,31 +320,31 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   
   console.log("========== 精算計算開始 ==========");
   
-  // ステップ1: 参加者の一覧を収集（すべての支払い者と参加者）
-  const allParticipants = new Set<string>();
+  // ステップ1: すべての支払いから参加者を抽出
+  const allParticipantsSet = new Set<string>();
   
+  // 各支出を処理して参加者を収集
   expenses.forEach(expense => {
-    // 支払者を追加
-    allParticipants.add(expense.payerName);
+    // 1. 支払者を追加
+    allParticipantsSet.add(expense.payerName);
     
-    // 割り勘参加者を追加
+    // 2. 各支出の明示的な参加者を追加
     if (expense.participants && expense.participants.length > 0) {
-      expense.participants.forEach((p: string) => allParticipants.add(p));
+      expense.participants.forEach((p: string) => allParticipantsSet.add(p));
     }
   });
   
-  const participants = Array.from(allParticipants);
+  const participants = Array.from(allParticipantsSet);
   console.log("すべての参加者:", participants);
   
-  // ステップ2: 各参加者の収支表を作成
+  // ステップ2: 各参加者の支払い/負担記録を初期化
   const balanceSheet: Record<string, { paid: number, shouldPay: number }> = {};
   
-  // 収支表を初期化
   participants.forEach(name => {
     balanceSheet[name] = { paid: 0, shouldPay: 0 };
   });
   
-  // ステップ3: 全支出を処理し、支払額と負担額を計算
+  // ステップ3: 各支出を処理して支払いと負担額を計算
   expenses.forEach(expense => {
     // 金額を数値に変換（確実に整数に）
     const amount = parseInt(expense.amount, 10);
@@ -410,11 +358,12 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     // 分担者を確定
     let splitParticipants: string[] = [];
     
+    // すべての支出について、参加者を明示的に指定するか全員で分ける
     if (expense.participants && expense.participants.length > 0) {
-      // 特定のメンバーで分割
+      // 明示的に指定された参加者で分割
       splitParticipants = expense.participants;
     } else {
-      // 全員で分割（全参加者）
+      // 全員で分割（すべての参加者）
       splitParticipants = participants;
     }
     
@@ -426,7 +375,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     
     console.log(`一人当たり基本金額: ${perPersonAmount}円, 端数: ${remainder}円`);
     
-    // 各参加者の負担額を計算
+    // 各参加者の負担額を計算して加算
     splitParticipants.forEach((person, index) => {
       let personShare = perPersonAmount;
       
@@ -449,7 +398,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   
   participants.forEach(name => {
     const { paid, shouldPay } = balanceSheet[name];
-    const balance = paid - shouldPay; // プラスなら受取、マイナスなら支払
+    const balance = paid - shouldPay; // プラスなら受け取り、マイナスなら支払い
     
     finalBalances.push({ name, amount: balance });
     console.log(`${name}, ${paid}円, ${shouldPay}円, ${balance > 0 ? '+' : ''}${balance}円`);
@@ -465,10 +414,10 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     .map(p => ({ ...p, amount: Math.abs(p.amount) })) // 絶対値に変換
     .sort((a, b) => b.amount - a.amount); // 支払額の多い順
   
-  console.log("\n受取側:", receivers.map(r => `${r.name}(${r.amount}円)`).join(', '));
-  console.log("支払側:", payers.map(p => `${p.name}(${p.amount}円)`).join(', '));
+  console.log("\n受取側:", receivers.map(r => `${r.name}(${r.amount}円)`).join(', ') || "なし");
+  console.log("支払側:", payers.map(p => `${p.name}(${p.amount}円)`).join(', ') || "なし");
   
-  // ステップ6: 精算指示の作成
+  // ステップ6: 精算指示の作成（最適なお金の流れを計算）
   console.log("\n===== 精算指示 =====");
   
   const totalReceive = receivers.reduce((sum, r) => sum + r.amount, 0);
@@ -484,33 +433,42 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   // 精算指示リスト
   const settlements: { from: string; to: string; amount: number }[] = [];
   
-  // 各支払者について処理
-  payers.forEach(payer => {
-    let remainingAmount = payer.amount;
+  // クローンを作成して操作用のオブジェクトを用意
+  const receiversClone = [...receivers];
+  const payersClone = [...payers];
+  
+  // 各支払者から最適な受取者への支払いを計算
+  while (payersClone.length > 0 && receiversClone.length > 0) {
+    // 現在処理中の支払者と受取者
+    const payer = payersClone[0];
+    const receiver = receiversClone[0];
     
-    // 各受取者に対して精算
-    receivers.forEach(receiver => {
-      if (remainingAmount <= 0 || receiver.amount <= 0) return;
+    // 支払い額を決定（より少ない方の金額）
+    const paymentAmount = Math.min(payer.amount, receiver.amount);
+    
+    if (paymentAmount > 0) {
+      // 精算指示を追加
+      settlements.push({
+        from: payer.name,
+        to: receiver.name,
+        amount: paymentAmount
+      });
       
-      // 精算額を決定（小さい方）
-      const settleAmount = Math.min(remainingAmount, receiver.amount);
+      console.log(`${payer.name} → ${receiver.name}: ${paymentAmount}円`);
       
-      if (settleAmount > 0) {
-        // 精算指示を追加
-        settlements.push({
-          from: payer.name,
-          to: receiver.name,
-          amount: settleAmount
-        });
-        
-        console.log(`${payer.name} → ${receiver.name}: ${settleAmount}円`);
-        
-        // 残額を更新
-        remainingAmount -= settleAmount;
-        receiver.amount -= settleAmount;
-      }
-    });
-  });
+      // 残額を更新
+      payer.amount -= paymentAmount;
+      receiver.amount -= paymentAmount;
+      
+      // 残額がないものを削除
+      if (payer.amount <= 0) payersClone.shift();
+      if (receiver.amount <= 0) receiversClone.shift();
+    } else {
+      // エラー防止（ここには来ないはず）
+      console.log("警告: 0円の支払いが発生しました");
+      break;
+    }
+  }
   
   console.log("========== 精算計算終了 ==========\n");
   
