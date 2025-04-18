@@ -26,7 +26,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <header className="bg-white shadow-sm border-b border-slate-200 py-3 px-4 flex items-center justify-between sticky top-0 z-10">
         <h1 className="text-lg font-bold text-primary flex items-center">
           <CalendarRange className="mr-2 h-5 w-5" />
-          イベント調整さん
+          調整ワリカン
         </h1>
         
         <button 
@@ -40,7 +40,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Desktop Navigation Links */}
         <div className="hidden md:flex items-center space-x-4">
           <NavLink href="/" icon={<HomeIcon size={18} />} label="ホーム" isActive={location === '/'} />
-          <NavLink href="/create" icon={<PlusCircle size={18} />} label="予定作成" isActive={location === '/create'} />
+          <NavLink href="/create" icon={<PlusCircle size={18} />} label="イベント作成" isActive={location === '/create'} />
         </div>
       </header>
       
@@ -66,12 +66,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
               }}
             >
               <PlusCircle className="mr-1 h-4 w-4" />
-              新しい予定を作成
+              新しいイベントを作成
             </div>
             
             <div className="space-y-2">
               <MobileNavLink href="/" icon={<HomeIcon className="h-5 w-5" />} label="ホーム" isActive={location === '/'} onClick={toggleMenu} />
-              <MobileNavLink href="/create" icon={<CalendarClock className="h-5 w-5" />} label="予定を作成" isActive={location === '/create'} onClick={toggleMenu} />
+              <MobileNavLink href="/create" icon={<CalendarClock className="h-5 w-5" />} label="イベントを作成" isActive={location === '/create'} onClick={toggleMenu} />
               <MobileNavLink href="/" icon={<Users className="h-5 w-5" />} label="参加予定一覧" isActive={false} onClick={toggleMenu} />
             </div>
           </div>
