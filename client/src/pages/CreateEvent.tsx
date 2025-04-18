@@ -14,10 +14,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
+
+type DateOption = {
+  date: Date;
+  useDefaultTime: boolean;
+  startTime?: string;
+  endTime?: string;
+};
 
 export default function CreateEvent() {
   const [, navigate] = useLocation();
@@ -27,12 +35,47 @@ export default function CreateEvent() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [creatorName, setCreatorName] = useState('');
-  const [creatorEmail, setCreatorEmail] = useState('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   
-  // Time options
-  const [startTime, setStartTime] = useState('19:00');
-  const [endTime, setEndTime] = useState('21:00');
+  // デフォルト時間設定
+  const [defaultStartTime, setDefaultStartTime] = useState('19:00');
+  const [defaultEndTime, setDefaultEndTime] = useState('21:00');
+  
+  // 日付選択時に自動的にDateOptions配列を更新
+  const handleSelectDates = (dates: Date[] | undefined) => {
+    if (!dates) return;
+    
+    setSelectedDates(dates);
+    
+    // 既存の日程オプションを保持しつつ、新しい日程を追加
+    const updatedDateOptions = dates.map(date => {
+      // 既存のオプションを探す
+      const existingOption = dateOptions.find(
+        option => format(option.date, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+      );
+      
+      // 既存のオプションがあればそれを返し、なければデフォルト設定で新規作成
+      return existingOption || {
+        date,
+        useDefaultTime: true,
+        startTime: undefined,
+        endTime: undefined
+      };
+    });
+    
+    setDateOptions(updatedDateOptions);
+  };
+  
+  // 個別の時間設定を更新
+  const updateDateOption = (index: number, field: string, value: any) => {
+    const updatedOptions = [...dateOptions];
+    updatedOptions[index] = {
+      ...updatedOptions[index],
+      [field]: value
+    };
+    setDateOptions(updatedOptions);
+  };
   
   const createEventMutation = useMutation({
     mutationFn: async (eventData: any) => {
@@ -58,28 +101,30 @@ export default function CreateEvent() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !creatorName || !creatorEmail || selectedDates.length === 0) {
+    if (!title || !creatorName || selectedDates.length === 0) {
       toast({
         title: "入力エラー",
-        description: "タイトル、お名前、メールアドレス、日程を入力してください",
+        description: "タイトル、お名前、日程を入力してください",
         variant: "destructive"
       });
       return;
     }
     
-    // Format dates for submission
-    const dateOptions = selectedDates.map(date => ({
-      date: format(date, 'yyyy-MM-dd'),
-      startTime,
-      endTime
+    // フォーマット日程オプション
+    const formattedDateOptions = dateOptions.map(option => ({
+      date: format(option.date, 'yyyy-MM-dd'),
+      startTime: option.useDefaultTime ? undefined : option.startTime,
+      endTime: option.useDefaultTime ? undefined : option.endTime,
+      useDefaultTime: option.useDefaultTime
     }));
     
     createEventMutation.mutate({
       title,
       description,
       creatorName,
-      creatorEmail,
-      dateOptions
+      defaultStartTime,
+      defaultEndTime,
+      dateOptions: formattedDateOptions
     });
   };
   
@@ -116,28 +161,15 @@ export default function CreateEvent() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="creatorName">お名前</Label>
-                <Input 
-                  id="creatorName" 
-                  value={creatorName} 
-                  onChange={(e) => setCreatorName(e.target.value)}
-                  placeholder="例: 田中 健太" 
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="creatorEmail">メールアドレス</Label>
-                <Input 
-                  id="creatorEmail" 
-                  type="email"
-                  value={creatorEmail} 
-                  onChange={(e) => setCreatorEmail(e.target.value)}
-                  placeholder="例: tanaka@example.com" 
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="creatorName">お名前</Label>
+              <Input 
+                id="creatorName" 
+                value={creatorName} 
+                onChange={(e) => setCreatorName(e.target.value)}
+                placeholder="例: 田中 健太" 
+                required
+              />
             </div>
           </CardContent>
         </Card>
@@ -152,47 +184,103 @@ export default function CreateEvent() {
               <Calendar
                 mode="multiple"
                 selected={selectedDates}
-                onSelect={setSelectedDates as any}
+                onSelect={handleSelectDates as any}
                 locale={ja}
                 className="mx-auto"
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startTime">開始時間</Label>
-                <Input 
-                  id="startTime" 
-                  type="time"
-                  value={startTime} 
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-md">
+                <h3 className="font-medium mb-3 text-slate-800">デフォルト時間設定</h3>
+                <p className="text-sm text-slate-600 mb-4">すべての日程に適用される基本時間を設定します</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultStartTime">デフォルト開始時間</Label>
+                    <Input 
+                      id="defaultStartTime" 
+                      type="time"
+                      value={defaultStartTime} 
+                      onChange={(e) => setDefaultStartTime(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultEndTime">デフォルト終了時間</Label>
+                    <Input 
+                      id="defaultEndTime" 
+                      type="time"
+                      value={defaultEndTime} 
+                      onChange={(e) => setDefaultEndTime(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="endTime">終了時間</Label>
-                <Input 
-                  id="endTime" 
-                  type="time"
-                  value={endTime} 
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="bg-slate-50 p-4 rounded-md">
-              <h3 className="font-medium mb-2 text-sm">選択された日程：</h3>
-              {selectedDates.length > 0 ? (
-                <ul className="space-y-1">
-                  {selectedDates.map((date, index) => (
-                    <li key={index} className="text-sm">
-                      {format(date, 'yyyy年MM月dd日(EEE)', { locale: ja })} {startTime} - {endTime}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500">日程が選択されていません</p>
+              
+              {selectedDates.length > 0 && (
+                <div className="border rounded-md">
+                  <div className="p-4 border-b bg-slate-50">
+                    <h3 className="font-medium text-slate-800">選択された日程</h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {dateOptions.map((option, index) => (
+                      <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
+                        <div className="flex flex-col space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium">
+                              {format(option.date, 'yyyy年MM月dd日(EEE)', { locale: ja })}
+                            </p>
+                            <div className="flex items-center space-x-2">
+                              <Label htmlFor={`useDefault-${index}`} className="text-sm text-slate-600">
+                                デフォルト時間を使用
+                              </Label>
+                              <Switch 
+                                id={`useDefault-${index}`}
+                                checked={option.useDefaultTime}
+                                onCheckedChange={(checked) => updateDateOption(index, 'useDefaultTime', checked)}
+                              />
+                            </div>
+                          </div>
+                          
+                          {!option.useDefaultTime && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 pl-5 border-l-2 border-slate-200">
+                              <div className="space-y-1">
+                                <Label htmlFor={`startTime-${index}`} className="text-sm">個別開始時間</Label>
+                                <Input 
+                                  id={`startTime-${index}`} 
+                                  type="time"
+                                  value={option.startTime || defaultStartTime}
+                                  onChange={(e) => updateDateOption(index, 'startTime', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor={`endTime-${index}`} className="text-sm">個別終了時間</Label>
+                                <Input 
+                                  id={`endTime-${index}`} 
+                                  type="time"
+                                  value={option.endTime || defaultEndTime}
+                                  onChange={(e) => updateDateOption(index, 'endTime', e.target.value)}
+                                  required
+                                />
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="text-slate-500 text-sm pl-2">
+                            {option.useDefaultTime ? (
+                              <span>時間: {defaultStartTime} - {defaultEndTime} （デフォルト）</span>
+                            ) : (
+                              <span>時間: {option.startTime || defaultStartTime} - {option.endTime || defaultEndTime}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </CardContent>

@@ -53,7 +53,7 @@ export default function EventAttendance() {
   }, [event?.dateOptions]);
   
   const submitAttendanceMutation = useMutation({
-    mutationFn: async (data: { name: string; email: string; responses: DateResponse[] }) => {
+    mutationFn: async (data: { name: string; responses: DateResponse[] }) => {
       const response = await apiRequest('POST', `/api/events/${id}/attendances`, data);
       return response.json();
     },
@@ -79,7 +79,6 @@ export default function EventAttendance() {
     
     submitAttendanceMutation.mutate({
       name,
-      email,
       responses
     });
   };
@@ -105,7 +104,6 @@ export default function EventAttendance() {
     // If we already have a participant ID, we're updating
     submitAttendanceMutation.mutate({
       name: participantName,
-      email: "", // Will be ignored on update
       responses
     });
   };

@@ -19,22 +19,22 @@ export default function IdentificationDialog({
   onIdentify 
 }: IdentificationDialogProps) {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !email) {
+    if (!name) {
       toast({
         title: "入力エラー",
-        description: "お名前とメールアドレスを入力してください",
+        description: "お名前を入力してください",
         variant: "destructive"
       });
       return;
     }
     
-    onIdentify(name, email);
+    // メールアドレスの代わりに空文字列を渡す
+    onIdentify(name, '');
     onClose();
   };
 
@@ -53,19 +53,6 @@ export default function IdentificationDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例: 田中 健太"
-              className="w-full"
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-slate-700">メールアドレス</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="例: tanaka@example.com"
               className="w-full"
               required
             />
