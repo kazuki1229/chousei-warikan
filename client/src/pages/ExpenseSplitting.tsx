@@ -313,21 +313,45 @@ export default function ExpenseSplitting() {
                       // 既存の参加者と重複していないか確認
                       if (!uniqueParticipants.includes(newParticipantName.trim())) {
                         const trimmedName = newParticipantName.trim();
-                        // 新しい参加者を追加
-                        setUniqueParticipants([...uniqueParticipants, trimmedName]);
-                        // 入力フィールドをクリア
-                        setNewParticipantName('');
-                        // 新規追加モードを終了
-                        setIsAddingNewPayer(false);
-                        
-                        // 精算データを更新（新メンバーが「全員で割り勘」に含まれるようにするため）
-                        queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
-                        queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
-                        
-                        // 通知
-                        toast({
-                          title: "参加者を追加しました",
-                          description: `${trimmedName}さんが参加者リストに追加されました`,
+                        // APIを呼び出して参加者を追加
+                        apiRequest('POST', `/api/events/${id}/participants`, {
+                          name: trimmedName
+                        })
+                        .then(response => {
+                          if (!response.ok) {
+                            // エラー処理
+                            return response.json().then(err => {
+                              throw new Error(err.message || "参加者の追加に失敗しました");
+                            });
+                          }
+                          return response.json();
+                        })
+                        .then(data => {
+                          // 成功した場合の処理
+                          // 新しい参加者をローカルの状態に追加
+                          setUniqueParticipants([...uniqueParticipants, trimmedName]);
+                          // 入力フィールドをクリア
+                          setNewParticipantName('');
+                          // 新規追加モードを終了
+                          setIsAddingNewPayer(false);
+                          
+                          // 精算データを更新（新メンバーが「全員で割り勘」に含まれるようにするため）
+                          queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
+                          queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
+                          
+                          // 通知
+                          toast({
+                            title: "参加者を追加しました",
+                            description: `${trimmedName}さんが参加者リストに追加されました`,
+                          });
+                        })
+                        .catch(error => {
+                          // エラー処理
+                          toast({
+                            title: "エラーが発生しました",
+                            description: error.message,
+                            variant: "destructive"
+                          });
                         });
                       } else {
                         toast({

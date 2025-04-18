@@ -37,7 +37,11 @@ export interface IStorage {
   createExpense(expense: InsertExpense & { id: string }): Promise<Expense>;
   getExpense(id: string): Promise<Expense | undefined>;
   getEventExpenses(eventId: string): Promise<Expense[]>;
+  updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
+  
+  // Utility methods
+  getEventParticipants(eventId: string): Promise<string[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -231,6 +235,44 @@ export class MemStorage implements IStorage {
   
   async deleteExpense(id: string): Promise<void> {
     this.expenses.delete(id);
+  }
+  
+  async updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense> {
+    const expense = this.expenses.get(id);
+    if (!expense) throw new Error("Expense not found");
+    
+    const updatedExpense = {
+      ...expense,
+      ...data,
+    };
+    this.expenses.set(id, updatedExpense);
+    return updatedExpense;
+  }
+  
+  async getEventParticipants(eventId: string): Promise<string[]> {
+    // イベントの全参加者を収集
+    const event = await this.getEvent(eventId);
+    if (!event) throw new Error("Event not found");
+    
+    // 1. イベント作成者を含む
+    const participants = new Set<string>([event.creatorName]);
+    
+    // 2. 参加者を含む
+    const attendances = await this.getEventAttendances(eventId);
+    attendances.forEach(attendance => {
+      participants.add(attendance.name);
+    });
+    
+    // 3. 支払い情報に含まれるすべての参加者を追加
+    const expenses = await this.getEventExpenses(eventId);
+    expenses.forEach(expense => {
+      participants.add(expense.payerName);
+      if (expense.participants && expense.participants.length > 0) {
+        expense.participants.forEach(name => participants.add(name));
+      }
+    });
+    
+    return Array.from(participants);
   }
 }
 

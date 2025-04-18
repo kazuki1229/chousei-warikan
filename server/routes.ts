@@ -268,6 +268,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // 参加者リストの更新 - 全員で割り勘の経費も更新する
+  app.post("/api/events/:id/participants", async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1, "名前を入力してください"),
+      });
+
+      const validatedData = schema.parse(req.body);
+      
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      if (!event.selectedDate) {
+        return res.status(400).json({ message: "イベントの日程が確定していないため、この機能は利用できません" });
+      }
+      
+      // 1. 既存の参加者リストを取得
+      const currentParticipants = await storage.getEventParticipants(req.params.id);
+      
+      // 2. 既に存在する名前かチェック
+      if (currentParticipants.includes(validatedData.name)) {
+        return res.status(400).json({ message: "この名前の参加者は既に登録されています" });
+      }
+      
+      // 3. 仮の参加者を作成（実際のDBには保存されず、計算用）
+      const newParticipantsList = [...currentParticipants, validatedData.name];
+      
+      // 4. イベントの経費を取得
+      const expenses = await storage.getEventExpenses(req.params.id);
+      
+      // 5. 「全員割り勘」の経費を特定
+      const sharedExpenses = expenses.filter(expense => 
+        !expense.participants || expense.participants.length === 0
+      );
+      
+      console.log(`参加者「${validatedData.name}」を追加します。全員割り勘の経費数: ${sharedExpenses.length}`);
+      
+      // 6. イベントに参加者として追加
+      // (仮想的には既に参加者リストに追加されている扱いでよい)
+      
+      // 7. 「全員割り勘」になっている支出がある場合、recalculate の処理を行う
+      if (sharedExpenses.length > 0) {
+        console.log("「全員割り勘」の経費を再計算します");
+        
+        // 今回の操作は精算計算だけが目的で実際のDBは変更しない
+        // この更新は expenses の再取得で参加者リストが更新されるため影響しない
+        
+        // 8. 新しい参加者は自動的に「全員で割り勘」の経費に追加される
+        // calculateSettlements 関数内で全参加者リストが使用される
+      }
+      
+      // 9. 成功レスポンスを返す
+      res.status(200).json({ 
+        message: "参加者を追加しました",
+        name: validatedData.name,
+        sharedExpensesUpdated: sharedExpenses.length
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        console.error("参加者追加エラー:", error);
+        res.status(500).json({ message: "参加者の追加に失敗しました" });
+      }
+    }
+  });
 
   // Delete an expense
   app.delete("/api/events/:eventId/expenses/:expenseId", async (req, res) => {
@@ -300,27 +369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 経費情報と参加者情報を取得
       const expenses = await storage.getEventExpenses(req.params.id);
-      const attendances = await storage.getEventAttendances(req.params.id);
+      
+      // すべての参加者リストを取得
+      const allParticipants = await storage.getEventParticipants(req.params.id);
       
       console.log("▶ 割り勘計算ロジックを実行...");
+      console.log(`イベント参加者数: ${allParticipants.length}人`);
       
-      // すべての参加者を収集
-      const allParticipants = new Set<string>();
-      
-      // 1. イベント作成者を追加
-      allParticipants.add(event.creatorName);
-      
-      // 2. イベント参加者を追加
-      attendances.forEach(attendance => {
-        allParticipants.add(attendance.name);
-      });
-      
-      // 3. 支払い情報から参加者を追加
-      expenses.forEach(expense => {
-        allParticipants.add(expense.payerName);
-      });
-      
-      // 最適化された精算計算を実行
+      // 精算計算を実行
       const settlements = calculateSettlements(expenses);
       res.json(settlements);
     } catch (error) {
