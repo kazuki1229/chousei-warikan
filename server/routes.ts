@@ -369,6 +369,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   // Generate settlements
   const settlements: { from: string; to: string; amount: number }[] = [];
   
+  // 精算額の計算: 誰が誰にいくら払うべきか
   // Find payers (negative balance) and receivers (positive balance)
   const payers: { name: string; amount: number }[] = [];
   const receivers: { name: string; amount: number }[] = [];
@@ -381,19 +382,26 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     }
   });
   
+  // 最適化ステップ1: 支払者を少額順に並べることで、早く清算を完了する人を優先
   // Sort by amount (descending for receivers, ascending for payers)
   payers.sort((a, b) => a.amount - b.amount);
   receivers.sort((a, b) => b.amount - a.amount);
   
-  // Match payers with receivers
-  while (payers.length > 0 && receivers.length > 0) {
-    const payer = payers[0];
-    const receiver = receivers[0];
+  // 最適化ステップ2: まずは直接支払いを生成
+  const directSettlements: { from: string; to: string; amount: number }[] = [];
+  
+  // Match payers with receivers for direct settlements
+  const tempPayers = [...payers];
+  const tempReceivers = [...receivers];
+  
+  while (tempPayers.length > 0 && tempReceivers.length > 0) {
+    const payer = tempPayers[0];
+    const receiver = tempReceivers[0];
     
     const amount = Math.min(payer.amount, receiver.amount);
     
     if (amount > 0) {
-      settlements.push({
+      directSettlements.push({
         from: payer.name,
         to: receiver.name,
         amount: Math.round(amount), // 小数点以下を四捨五入
@@ -403,9 +411,77 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     payer.amount -= amount;
     receiver.amount -= amount;
     
-    if (payer.amount < 0.01) payers.shift();
-    if (receiver.amount < 0.01) receivers.shift();
+    if (payer.amount < 0.01) tempPayers.shift();
+    if (receiver.amount < 0.01) tempReceivers.shift();
   }
   
-  return settlements;
+  // 最適化ステップ3: 支払いネットワークを最適化して、取引回数を減らす
+  if (directSettlements.length <= 2) {
+    // 支払い回数が少ない場合は最適化の必要がないのでそのまま返す
+    return directSettlements;
+  }
+  
+  // 支払いグラフを構築
+  const graph: { [key: string]: { [key: string]: number } } = {};
+  
+  // グラフの初期化
+  const graphParticipants = new Set<string>();
+  directSettlements.forEach(s => {
+    graphParticipants.add(s.from);
+    graphParticipants.add(s.to);
+  });
+  
+  Array.from(graphParticipants).forEach(person => {
+    graph[person] = {};
+  });
+  
+  // 直接支払いをグラフにマッピング
+  directSettlements.forEach(s => {
+    graph[s.from][s.to] = (graph[s.from][s.to] || 0) + s.amount;
+  });
+  
+  // フロイド-ワーシャルアルゴリズムを使用して、間接支払いの可能性を見つける
+  Array.from(graphParticipants).forEach(k => {
+    Array.from(graphParticipants).forEach(i => {
+      if (i !== k) {
+        Array.from(graphParticipants).forEach(j => {
+          if (j !== i && j !== k && 
+              graph[i][k] !== undefined && 
+              graph[k][j] !== undefined) {
+            // i -> k -> j の間接経路が存在する場合
+            const throughK = Math.min(graph[i][k], graph[k][j]);
+            
+            // i -> j への直接経路があれば更新、なければ作成
+            if (graph[i][j] === undefined) {
+              graph[i][j] = 0;
+            }
+            
+            graph[i][j] += throughK;
+            graph[i][k] -= throughK;
+            graph[k][j] -= throughK;
+            
+            // 0になった経路を削除
+            if (Math.abs(graph[i][k]) < 0.01) delete graph[i][k];
+            if (Math.abs(graph[k][j]) < 0.01) delete graph[k][j];
+          }
+        });
+      }
+    });
+  });
+  
+  // 最適化されたグラフから精算リストを構築
+  Object.entries(graph).forEach(([from, toMap]) => {
+    Object.entries(toMap).forEach(([to, amount]) => {
+      if (amount > 0.01) {
+        settlements.push({
+          from,
+          to,
+          amount: Math.round(amount), // 小数点以下を四捨五入
+        });
+      }
+    });
+  });
+  
+  // もし最適化によって支払いが増えた場合は、元の直接支払いを使用
+  return settlements.length < directSettlements.length ? settlements : directSettlements;
 }
