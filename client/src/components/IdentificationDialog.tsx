@@ -9,7 +9,7 @@ interface IdentificationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   eventId: string;
-  onIdentify: (name: string, email: string) => void;
+  onIdentify: (name: string) => void;
 }
 
 export default function IdentificationDialog({ 
@@ -33,8 +33,7 @@ export default function IdentificationDialog({
       return;
     }
     
-    // メールアドレスの代わりに空文字列を渡す
-    onIdentify(name, '');
+    onIdentify(name);
     onClose();
   };
 

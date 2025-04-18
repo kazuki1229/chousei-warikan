@@ -150,29 +150,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "イベントが見つかりません" });
       }
       
-      // 新しい出席情報を作成
-      const attendanceId = nanoid();
-      const attendance = await storage.createAttendance({
-        id: attendanceId,
-        eventId: req.params.id,
-        name: validatedData.name,
-      });
+      // 既存の出席者リストを取得
+      const existingAttendances = await storage.getEventAttendances(req.params.id);
+      const existingAttendance = existingAttendances.find(a => a.name === validatedData.name);
       
-      // Create responses
-      await Promise.all(
-        validatedData.responses.map(response => 
-          storage.createAttendanceResponse({
-            attendanceId: attendanceId,
-            dateOptionId: response.dateOptionId,
-            status: response.status,
-          })
-        )
-      );
+      let attendance;
       
-      // Update participant count
-      await storage.updateEvent(req.params.id, {
-        participantsCount: (event.participantsCount || 0) + 1,
-      });
+      if (existingAttendance) {
+        // 既存の回答を更新
+        await storage.updateAttendanceResponses(existingAttendance.id, validatedData.responses);
+        attendance = existingAttendance;
+      } else {
+        // 新しい出席情報を作成
+        const attendanceId = nanoid();
+        attendance = await storage.createAttendance({
+          id: attendanceId,
+          eventId: req.params.id,
+          name: validatedData.name,
+        });
+        
+        // Create responses
+        await Promise.all(
+          validatedData.responses.map(response => 
+            storage.createAttendanceResponse({
+              attendanceId: attendanceId,
+              dateOptionId: response.dateOptionId,
+              status: response.status,
+            })
+          )
+        );
+        
+        // Update participant count
+        await storage.updateEvent(req.params.id, {
+          participantsCount: (event.participantsCount || 0) + 1,
+        });
+      }
       
       res.status(201).json(attendance);
     } catch (error) {

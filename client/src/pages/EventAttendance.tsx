@@ -74,7 +74,7 @@ export default function EventAttendance() {
     }
   });
   
-  const handleIdentify = (name: string, email: string) => {
+  const handleIdentify = (name: string) => {
     setParticipantName(name);
     
     submitAttendanceMutation.mutate({

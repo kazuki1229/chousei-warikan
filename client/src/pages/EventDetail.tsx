@@ -72,7 +72,7 @@ export default function EventDetail() {
     });
   };
   
-  const handleIdentify = (name: string, email: string) => {
+  const handleIdentify = (name: string) => {
     navigate(`/event/${id}/attendance`);
   };
   
@@ -275,7 +275,6 @@ export default function EventDetail() {
                     >
                       <div>
                         <p className="font-medium">{attendance.name}</p>
-                        <p className="text-sm text-slate-500">{attendance.email}</p>
                       </div>
                     </div>
                   ))}
