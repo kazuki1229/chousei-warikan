@@ -96,7 +96,7 @@ export class MemStorage implements IStorage {
     ) as Promise<Event[]>;
   }
   
-  async updateEvent(id: string, data: Partial<InsertEvent>): Promise<Event> {
+  async updateEvent(id: string, data: Partial<InsertEvent> & { participants?: string[] }): Promise<Event> {
     const event = this.events.get(id);
     if (!event) throw new Error("Event not found");
     
@@ -264,38 +264,61 @@ export class MemStorage implements IStorage {
     const event = await this.getEvent(eventId);
     if (!event) throw new Error("Event not found");
     
-    // イベントにparticipantsフィールドが明示的に設定されていれば、それを使用
-    if (event.participants && event.participants.length > 0) {
-      console.log(`イベントに明示的に設定された参加者リストを使用: ${event.participants.join(', ')}`);
-      return [...event.participants];
+    // 参加者リストを再計算する前に、既存のリストをマージするために保持
+    const existingParticipants = event.participants || [];
+    
+    // 1. イベント作成者を含む
+    const participants = new Set<string>();
+    if (event.creatorName) {
+      participants.add(event.creatorName);
     }
     
-    // 参加者リストがなければ、様々なソースから収集
-    // 1. イベント作成者を含む
-    const participants = new Set<string>([event.creatorName]);
+    // 2. 既存の参加者リストを追加
+    if (existingParticipants && existingParticipants.length > 0) {
+      existingParticipants.forEach(name => participants.add(name));
+    }
     
-    // 2. 参加者を含む
+    // 3. 参加者を含む
     const attendances = await this.getEventAttendances(eventId);
     attendances.forEach(attendance => {
-      participants.add(attendance.name);
+      if (attendance.name) {
+        participants.add(attendance.name);
+      }
     });
     
-    // 3. 支払い情報に含まれるすべての参加者を追加
+    // 4. 支払い情報に含まれるすべての参加者を追加
+    console.log("経費情報から参加者を集計...");
     const expenses = await this.getEventExpenses(eventId);
     expenses.forEach(expense => {
-      participants.add(expense.payerName);
+      if (expense.payerName) {
+        participants.add(expense.payerName);
+      }
+      
       if (expense.participants && expense.participants.length > 0) {
-        expense.participants.forEach(name => participants.add(name));
+        expense.participants.forEach(name => {
+          if (name) participants.add(name);
+        });
       }
     });
     
     // 収集した参加者リストをイベントに保存して次回以降使用できるようにする
     const participantsList = Array.from(participants);
-    await this.updateEvent(eventId, {
-      participants: participantsList
-    });
+    console.log(`経費情報から抽出した参加者数: ${expenses.length}人`);
+    console.log(`参加者リスト統合後: ${participantsList.length}人`);
     
-    console.log(`計算された参加者リスト: ${participantsList.join(', ')}`);
+    // 参加者リストが変更された場合のみ更新
+    const isParticipantsChanged = 
+      !existingParticipants.length || 
+      participantsList.length !== existingParticipants.length ||
+      participantsList.some(p => !existingParticipants.includes(p));
+      
+    if (isParticipantsChanged) {
+      await this.updateEvent(eventId, {
+        participants: participantsList
+      });
+      console.log(`参加者リストを更新しました: ${participantsList.join(', ')}`);
+    }
+    
     return participantsList;
   }
 }

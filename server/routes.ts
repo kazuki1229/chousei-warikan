@@ -103,6 +103,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!event) {
         return res.status(404).json({ message: "イベントが見つかりません" });
       }
+
+      // イベントに参加者リストが含まれていない場合、取得する
+      if (!event.participants || !Array.isArray(event.participants) || event.participants.length === 0) {
+        try {
+          // 参加者リストを取得してマージ
+          const participants = await storage.getEventParticipants(req.params.id);
+          event.participants = participants;
+          console.log(`イベント ${req.params.id} の参加者リストをロード: ${participants.join(', ')}`);
+        } catch (err) {
+          console.error('参加者リスト取得エラー:', err);
+        }
+      }
+      
       res.json(event);
     } catch (error) {
       res.status(500).json({ message: "イベントの取得に失敗しました" });
