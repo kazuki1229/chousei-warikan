@@ -319,6 +319,11 @@ export default function ExpenseSplitting() {
                         setNewParticipantName('');
                         // 新規追加モードを終了
                         setIsAddingNewPayer(false);
+                        
+                        // 精算データを更新（新メンバーが「全員で割り勘」に含まれるようにするため）
+                        queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
+                        queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
+                        
                         // 通知
                         toast({
                           title: "参加者を追加しました",

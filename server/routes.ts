@@ -298,11 +298,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "イベントの日程が確定していないため、精算機能は利用できません" });
       }
       
+      // 経費情報と参加者情報を取得
       const expenses = await storage.getEventExpenses(req.params.id);
+      const attendances = await storage.getEventAttendances(req.params.id);
       
       console.log("▶ 割り勘計算ロジックを実行...");
       
-      // 通常の計算
+      // すべての参加者を収集
+      const allParticipants = new Set<string>();
+      
+      // 1. イベント作成者を追加
+      allParticipants.add(event.creatorName);
+      
+      // 2. イベント参加者を追加
+      attendances.forEach(attendance => {
+        allParticipants.add(attendance.name);
+      });
+      
+      // 3. 支払い情報から参加者を追加
+      expenses.forEach(expense => {
+        allParticipants.add(expense.payerName);
+      });
+      
+      // 最適化された精算計算を実行
       const settlements = calculateSettlements(expenses);
       res.json(settlements);
     } catch (error) {
