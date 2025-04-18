@@ -236,13 +236,10 @@ export default function ExpenseSplitting() {
     return sum + expenseAmount;
   }, 0) || 0;
   
-  const participantCount = expenses?.reduce((participants, expense) => {
-    if (!participants.includes(expense.payerName)) {
-      participants.push(expense.payerName);
-    }
-    return participants;
-  }, [] as string[]).length || 0;
+  // イベントの全参加者数（イベント作成者+参加者）
+  const participantCount = uniqueParticipants.length;
   
+  // 一人当たりの金額
   const perPersonAmount = participantCount > 0 ? totalExpenses / participantCount : 0;
   
   return (

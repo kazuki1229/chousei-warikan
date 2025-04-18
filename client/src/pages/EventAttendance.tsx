@@ -76,11 +76,42 @@ export default function EventAttendance() {
     },
     onSuccess: (data) => {
       setParticipantId(data.id);
+      setParticipantName(data.name);
       queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/attendances`] });
+      
+      // Store event info in localStorage for the Home page
+      try {
+        const storedEvents = localStorage.getItem('recentEvents');
+        const recentEvents = storedEvents ? JSON.parse(storedEvents) : [];
+        
+        // Add or update this event
+        const eventIndex = recentEvents.findIndex(
+          (e: any) => e.id === id
+        );
+        
+        if (eventIndex === -1) {
+          // Add new event to recent list
+          recentEvents.push({
+            id,
+            title: event.title
+          });
+        }
+        
+        // Save back to localStorage with 20 most recent events
+        localStorage.setItem('recentEvents', JSON.stringify(
+          recentEvents.slice(-20)
+        ));
+      } catch (error) {
+        console.error('Failed to save recent event to localStorage:', error);
+      }
+      
       toast({
         title: "回答を送信しました",
         description: "出欠回答ありがとうございます",
       });
+      
+      // 回答送信後はイベント詳細ページに遷移する
+      navigate(`/event/${id}`);
     },
     onError: (error) => {
       toast({
