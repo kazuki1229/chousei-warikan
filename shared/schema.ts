@@ -49,6 +49,7 @@ export const expenses = pgTable("expenses", {
   payerName: text("payer_name").notNull(),
   description: text("description").notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  participants: text("participants").array().default([]).notNull(), // 割り勘対象者の配列
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

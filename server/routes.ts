@@ -236,6 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payerName: z.string().min(1, "支払者名を入力してください"),
         description: z.string().min(1, "項目を入力してください"),
         amount: z.number().positive("金額は0より大きい値を入力してください"),
+        participants: z.array(z.string()).default([]), // 割り勘対象者の配列（指定がない場合は空配列）
       });
 
       const validatedData = schema.parse(req.body);
@@ -255,6 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payerName: validatedData.payerName,
         description: validatedData.description,
         amount: String(validatedData.amount),
+        participants: validatedData.participants,
       });
       
       res.status(201).json(expense);
@@ -312,43 +314,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function calculateSettlements(expenses: any[]): { from: string; to: string; amount: number }[] {
   if (!expenses.length) return [];
   
-  // Calculate how much each person paid
-  const payments: { [key: string]: number } = {};
-  let totalAmount = 0;
+  // すべての参加者を集める
+  const allParticipants = new Set<string>();
   
+  // 支払者は常に参加者に含める
   expenses.forEach(expense => {
-    payments[expense.payerName] = (payments[expense.payerName] || 0) + Number(expense.amount);
-    totalAmount += Number(expense.amount);
+    allParticipants.add(expense.payerName);
   });
   
-  const participants = Object.keys(payments);
-  const perPersonAmount = totalAmount / participants.length;
+  // 各支出の計算を行う
+  const personalBalances: { [key: string]: number } = {};
   
-  // Calculate how much each person should pay or receive
-  const balances: { [key: string]: number } = {};
-  
-  participants.forEach(person => {
-    balances[person] = payments[person] - perPersonAmount;
+  expenses.forEach(expense => {
+    const amount = Number(expense.amount);
+    const payerName = expense.payerName;
+    
+    // 支払者には支払い額を加算
+    personalBalances[payerName] = (personalBalances[payerName] || 0) + amount;
+    
+    // 指定された参加者間で分割する
+    let splitParticipants: string[] = [];
+    
+    // 参加者が指定されている場合はその参加者で分割、そうでなければ全員で分割
+    if (expense.participants && expense.participants.length > 0) {
+      splitParticipants = expense.participants;
+      // 参加者リストに入っていない人も追加
+      splitParticipants.forEach(p => allParticipants.add(p));
+    } else {
+      // 参加者が指定されていない場合は、その時点でのすべての支払い者で分割
+      const currentPayers = [...allParticipants];
+      splitParticipants = currentPayers;
+    }
+    
+    // 参加者ごとの割り勘額を計算
+    const perPersonAmount = amount / splitParticipants.length;
+    
+    // 各参加者の残高を更新
+    splitParticipants.forEach(person => {
+      // 支払った人自身も分担するが、既に支払い額を加算済みなので差し引く
+      if (person === payerName) {
+        personalBalances[person] = (personalBalances[person] || 0) - perPersonAmount;
+      } else {
+        personalBalances[person] = (personalBalances[person] || 0) - perPersonAmount;
+      }
+    });
   });
   
   // Generate settlements
   const settlements: { from: string; to: string; amount: number }[] = [];
   
-  // Sort participants by balance (descending)
-  const sortedParticipants = [...participants].sort((a, b) => balances[b] - balances[a]);
-  
   // Find payers (negative balance) and receivers (positive balance)
   const payers: { name: string; amount: number }[] = [];
   const receivers: { name: string; amount: number }[] = [];
   
-  sortedParticipants.forEach(person => {
-    const balance = balances[person];
+  Object.entries(personalBalances).forEach(([person, balance]) => {
     if (balance < -0.01) {
       payers.push({ name: person, amount: -balance });
     } else if (balance > 0.01) {
       receivers.push({ name: person, amount: balance });
     }
   });
+  
+  // Sort by amount (descending for receivers, ascending for payers)
+  payers.sort((a, b) => a.amount - b.amount);
+  receivers.sort((a, b) => b.amount - a.amount);
   
   // Match payers with receivers
   while (payers.length > 0 && receivers.length > 0) {
@@ -361,7 +390,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
       settlements.push({
         from: payer.name,
         to: receiver.name,
-        amount: Math.round(amount),
+        amount: Math.round(amount), // 小数点以下を四捨五入
       });
     }
     
