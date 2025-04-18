@@ -43,12 +43,17 @@ export default function EventAttendance() {
   
   const { data: attendancesList, isLoading: attendancesLoading } = useQuery<any[]>({
     queryKey: [`/api/events/${id}/attendances`],
-    onSuccess: (data) => {
-      if (data) {
-        setAttendances(data.map(item => ({ id: item.id, name: item.name })));
-      }
-    }
   });
+  
+  // 参加者リストが更新されたら状態を更新
+  useEffect(() => {
+    if (attendancesList) {
+      setAttendances(attendancesList.map(item => ({ 
+        id: item.id, 
+        name: item.name 
+      })));
+    }
+  }, [attendancesList]);
   
   const isLoading = eventLoading || attendancesLoading;
   
@@ -237,7 +242,18 @@ export default function EventAttendance() {
                             setParticipantId(attendance.id);
                             setParticipantName(attendance.name);
                             
-                            // ここで既存の回答を取得するロジックがあると理想的
+                            // 既存の回答があればロード
+                            const existing = attendancesList?.find(a => a.id === attendance.id);
+                            if (existing && existing.responses && existing.responses.length > 0) {
+                              // 既存の回答をロード
+                              setResponses(
+                                existing.responses.map((resp: any) => ({
+                                  dateOptionId: resp.dateOptionId,
+                                  status: resp.status as AttendanceStatus
+                                }))
+                              );
+                            }
+                            
                             toast({
                               title: "参加者を選択しました",
                               description: `${attendance.name}さんとして回答します`,
