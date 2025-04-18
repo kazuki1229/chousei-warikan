@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import IdentificationDialog from '@/components/IdentificationDialog';
-import { Event, Attendance } from '@shared/schema';
+import { Event, Attendance, Expense } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { formatDate } from '@/lib/utils';
 
@@ -34,6 +34,7 @@ export default function EventDetail() {
   const queryClient = useQueryClient();
   
   const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
+  const [allParticipants, setAllParticipants] = useState<string[]>([]);
   
   const { data: event, isLoading } = useQuery<Event>({
     queryKey: [`/api/events/${id}`],
@@ -43,6 +44,64 @@ export default function EventDetail() {
     queryKey: [`/api/events/${id}/attendances`],
     enabled: !!event,
   });
+  
+  // 費用精算で追加された参加者を取得するためのクエリ
+  const { data: expenses } = useQuery<Expense[]>({
+    queryKey: [`/api/events/${id}/expenses`],
+    enabled: !!event && !!event.selectedDate,
+  });
+  
+  // 全参加者リストを構築（出席情報+経費情報+イベント作成者から）
+  useEffect(() => {
+    if (event) {
+      const participants: string[] = [];
+      
+      // イベント作成者を追加
+      if (event.creatorName && !participants.includes(event.creatorName)) {
+        participants.push(event.creatorName);
+      }
+      
+      // イベントの参加者フィールドを追加（費用精算で追加された人を含む）
+      if (event.participants && Array.isArray(event.participants)) {
+        event.participants.forEach((name: string) => {
+          if (!participants.includes(name)) {
+            participants.push(name);
+          }
+        });
+      }
+      
+      // 出席回答者を追加
+      if (attendances) {
+        attendances.forEach(attendance => {
+          if (!participants.includes(attendance.name)) {
+            participants.push(attendance.name);
+          }
+        });
+      }
+      
+      // 支出記録から支払者を追加
+      if (expenses) {
+        expenses.forEach(expense => {
+          if (!participants.includes(expense.payerName)) {
+            participants.push(expense.payerName);
+          }
+          
+          // 支出の参加者も追加
+          if (expense.participants && Array.isArray(expense.participants)) {
+            expense.participants.forEach((name: string) => {
+              if (!participants.includes(name)) {
+                participants.push(name);
+              }
+            });
+          }
+        });
+      }
+      
+      // 参加者リストを更新
+      setAllParticipants(participants);
+      console.log("全参加者リスト更新:", participants);
+    }
+  }, [event, attendances, expenses]);
   
   // イベントが読み込まれたら、ローカルストレージに保存して「参加中のイベント」として追跡
   useEffect(() => {
@@ -375,7 +434,7 @@ export default function EventDetail() {
                 <div>
                   <CardTitle className="text-lg">参加者一覧</CardTitle>
                   <CardDescription>
-                    全ての参加者: {attendances?.length || 0}人
+                    全ての参加者: {allParticipants.length || 0}人
                   </CardDescription>
                 </div>
                 
@@ -389,18 +448,18 @@ export default function EventDetail() {
               </div>
             </CardHeader>
             <CardContent>
-              {attendances && attendances.length > 0 ? (
+              {allParticipants.length > 0 ? (
                 <div className="divide-y">
-                  {attendances.map((attendance) => (
+                  {allParticipants.map((name) => (
                     <div 
-                      key={attendance.id} 
+                      key={name} 
                       className="flex items-center py-3"
                     >
                       <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3">
-                        {attendance.name.charAt(0)}
+                        {name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-medium">{attendance.name}</p>
+                        <p className="font-medium">{name}</p>
                       </div>
                     </div>
                   ))}

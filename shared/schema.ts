@@ -86,13 +86,17 @@ export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 
 export type Event = typeof events.$inferSelect & {
   dateOptions: DateOption[];
+  participants?: string[]; // 精算機能で追加された参加者リスト
 };
 
 export type DateOption = typeof dateOptions.$inferSelect;
 export type Attendance = typeof attendances.$inferSelect & {
   responses: (typeof attendanceResponses.$inferSelect & { status: 'available' | 'maybe' | 'unavailable' })[];
 };
-export type Expense = typeof expenses.$inferSelect;
+export type Expense = typeof expenses.$inferSelect & {
+  participants?: string[]; // 参加者リスト（この支出の割り勘対象者）
+  isSharedWithAll?: boolean; // 全員割り勘フラグ
+};
 
 // Additional types for the application
 export type Settlement = {
