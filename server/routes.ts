@@ -340,9 +340,6 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     const amount = Number(expense.amount);
     const payerName = expense.payerName;
     
-    // 支払者には支払い額を加算（立替分）
-    personalBalances[payerName] += amount;
-    
     // 指定された参加者間で分割する
     let splitParticipants: string[] = [];
     
@@ -354,12 +351,18 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
       splitParticipants = Array.from(allParticipants);
     }
     
-    // 参加者ごとの割り勘額を計算
+    // 各参加者が支払うべき金額を計算
     const perPersonAmount = amount / splitParticipants.length;
     
-    // 各参加者の残高を更新（負担分を引く）
+    // 支払者自身も分担額を持つことに注意
     splitParticipants.forEach(person => {
-      personalBalances[person] -= perPersonAmount;
+      if (person === payerName) {
+        // 支払者の場合: 立て替え総額から自分の負担分を引いた額がプラス（受け取るべき額）
+        personalBalances[payerName] += (amount - perPersonAmount);
+      } else {
+        // その他の参加者: 負担分を引く（支払うべき額）
+        personalBalances[person] -= perPersonAmount;
+      }
     });
   });
   
