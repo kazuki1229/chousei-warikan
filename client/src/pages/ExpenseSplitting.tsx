@@ -279,9 +279,19 @@ export default function ExpenseSplitting() {
   
   return (
     <div className="w-full">
-      <h1 className="text-xl font-bold text-slate-800 mb-4">
-        {event.title} <span className="text-slate-500 font-normal">- 費用精算</span>
-      </h1>
+      <div className="flex items-center gap-2 mb-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/event/${id}`)}
+          className="text-slate-500 hover:text-slate-700 px-2 -ml-2"
+        >
+          ← 戻る
+        </Button>
+        <h1 className="text-xl font-bold text-slate-800">
+          {event.title} <span className="text-slate-500 font-normal">- 費用精算</span>
+        </h1>
+      </div>
       
       <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0 mb-6">
         {/* 支払総額カード */}
