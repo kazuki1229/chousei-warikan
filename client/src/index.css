@@ -58,6 +58,7 @@
 }
 
 @layer components {
+  /* カレンダー関連のスタイル */
   .calendar-day {
     @apply aspect-square;
   }
@@ -70,6 +71,7 @@
     @apply border-2 border-primary;
   }
   
+  /* 参加可否ボタンのスタイル */
   .availability-button {
     @apply px-3 py-1 text-xs rounded-full;
   }
@@ -88,5 +90,53 @@
   
   .availability-button.unavailable {
     @apply bg-red-100 text-red-800;
+  }
+  
+  /* モバイル向け最適化スタイル */
+  .mobile-card {
+    @apply rounded-lg shadow-sm border border-gray-200 bg-white overflow-hidden;
+  }
+  
+  .card-header-mobile {
+    @apply p-3 bg-white border-b border-gray-100;
+  }
+  
+  .card-content-mobile {
+    @apply p-3;
+  }
+  
+  /* モバイルフォームスタイル */
+  .form-mobile input,
+  .form-mobile select,
+  .form-mobile textarea {
+    @apply text-base py-2 px-3 rounded-md;
+  }
+  
+  .form-mobile label {
+    @apply text-sm font-medium mb-1;
+  }
+  
+  /* モバイルアクションボタン */
+  .mobile-action-button {
+    @apply fixed bottom-20 right-4 shadow-lg bg-primary text-white rounded-full p-3;
+  }
+  
+  /* スマホ向け調整 */
+  @media (max-width: 640px) {
+    h1 {
+      @apply text-xl;
+    }
+    
+    h2 {
+      @apply text-lg;
+    }
+    
+    .card-title {
+      @apply text-base;
+    }
+    
+    .card-description {
+      @apply text-xs;
+    }
   }
 }
