@@ -492,7 +492,7 @@ export default function ExpenseSplitting() {
                       const numericValue = e.target.value.replace(/[^0-9]/g, '');
                       setNewExpense({...newExpense, amount: numericValue});
                     }}
-                    placeholder="10000"
+                    placeholder="   数字を入力"
                     type="text"
                     pattern="[0-9]*"
                     inputMode="numeric"
