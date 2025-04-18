@@ -264,6 +264,13 @@ export class MemStorage implements IStorage {
     const event = await this.getEvent(eventId);
     if (!event) throw new Error("Event not found");
     
+    // イベントにparticipantsフィールドが明示的に設定されていれば、それを使用
+    if (event.participants && event.participants.length > 0) {
+      console.log(`イベントに明示的に設定された参加者リストを使用: ${event.participants.join(', ')}`);
+      return [...event.participants];
+    }
+    
+    // 参加者リストがなければ、様々なソースから収集
     // 1. イベント作成者を含む
     const participants = new Set<string>([event.creatorName]);
     
@@ -282,7 +289,14 @@ export class MemStorage implements IStorage {
       }
     });
     
-    return Array.from(participants);
+    // 収集した参加者リストをイベントに保存して次回以降使用できるようにする
+    const participantsList = Array.from(participants);
+    await this.updateEvent(eventId, {
+      participants: participantsList
+    });
+    
+    console.log(`計算された参加者リスト: ${participantsList.join(', ')}`);
+    return participantsList;
   }
 }
 

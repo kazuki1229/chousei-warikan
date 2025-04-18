@@ -264,6 +264,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participants = allParticipants;
       }
       
+      // これが全員割り勘である場合は、常に最新の参加者リストを取得して使用する
+      if (isSharedWithAll) {
+        console.log("全員割り勘なので最新の参加者リストを強制的に使用します");
+        const freshParticipants = await storage.getEventParticipants(req.params.id);
+        participants = freshParticipants;
+      }
+      
       const expense = await storage.createExpense({
         id: nanoid(),
         eventId: req.params.id,
@@ -367,6 +374,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // 明示的にこの参加者をストレージに追加
+      console.log(`明示的にイベント参加者「${validatedData.name}」をストレージに追加`);
+      
+      // イベントに参加者を追加する
+      if (!event.participants) {
+        event.participants = [];
+      }
+      
+      // 参加者リストに追加
+      event.participants.push(validatedData.name);
+      
+      // イベントを更新
+      await storage.updateEvent(req.params.id, {
+        participants: event.participants
+      });
+      
+      console.log(`データベースの参加者リストを更新: ${event.participants.join(', ')}`);
+      
       // 9. 成功レスポンスを返す - 更新された支出総数を返す
       const totalUpdatedExpenses = sharedExpenses.length + oldStyleSharedExpenses.length;
       res.status(200).json({ 
@@ -416,7 +441,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 経費情報と参加者情報を取得
       const expenses = await storage.getEventExpenses(req.params.id);
       
-      // すべての参加者リストを取得
+      // 参加者リストを明示的に取得し、イベントにも保存する
+      console.log("最新の参加者リストを収集中...");
+      
+      const allExpenses = await storage.getEventExpenses(req.params.id);
+      const payersSet = new Set<string>();
+      const expenseParticipantsSet = new Set<string>();
+      
+      // すべての支払いから参加者を収集 (全てのソースから改めて集めて漏れがないようにする)
+      allExpenses.forEach(expense => {
+        // 支払者を追加
+        payersSet.add(expense.payerName);
+        
+        // 明示的な参加者を追加
+        if (expense.participants && expense.participants.length > 0) {
+          expense.participants.forEach(p => expenseParticipantsSet.add(p));
+        }
+      });
+      
+      // イベント作成者も追加
+      if (event.creatorName) {
+        expenseParticipantsSet.add(event.creatorName);
+      }
+      
+      const allParticipantsFromExpenses = [
+        ...Array.from(payersSet),
+        ...Array.from(expenseParticipantsSet)
+      ];
+      
+      // イベントにも保存
+      if (!event.participants) {
+        event.participants = [];
+      }
+      
+      // 既存の参加者と新たに検出した参加者をマージ
+      const mergedParticipants = [...new Set([
+        ...event.participants,
+        ...allParticipantsFromExpenses
+      ])];
+      
+      // イベントの参加者リストを更新
+      await storage.updateEvent(req.params.id, {
+        participants: mergedParticipants
+      });
+      
+      // 最新の参加者リストを取得して使用
       const allParticipants = await storage.getEventParticipants(req.params.id);
       
       console.log("▶ 割り勘計算ロジックを実行...");
