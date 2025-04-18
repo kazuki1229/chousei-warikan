@@ -79,10 +79,11 @@ export default function ExpenseSplitting() {
     enabled: !!event,
   });
   
-  // 精算情報を取得
-  const { data: settlements, isLoading: settlementsLoading } = useQuery<Settlement[]>({
+  // 精算情報を取得する際に最新の参加者リストも自動的に更新される
+  const { data: settlements, isLoading: settlementsLoading, refetch: refetchSettlements } = useQuery<Settlement[]>({
     queryKey: [`/api/events/${id}/settlements`],
     enabled: !!event && !!expenses && expenses.length > 0,
+    refetchInterval: 2000, // 2秒ごとに自動更新 (新しい参加者が追加された場合に最新の計算を取得)
   });
   
   // イベント作成者を含む全参加者リストを作成
@@ -195,6 +196,30 @@ export default function ExpenseSplitting() {
     // 元の支出データをそのまま利用する（自動的に全員割り勘になるように修正済み）
     addExpenseMutation.mutate(newExpense);
   };
+  
+  // settlements APIがイベント参加者リストも取得・更新するので、それに対する処理も追加
+  useEffect(() => {
+    if (settlements && settlements.length > 0) {
+      // settlementからユニークな参加者を抽出
+      const participantsFromSettlements = new Set<string>();
+      
+      settlements.forEach(s => {
+        if (s.from) participantsFromSettlements.add(s.from);
+        if (s.to) participantsFromSettlements.add(s.to);
+      });
+      
+      // 既存の参加者リストと結合
+      if (participantsFromSettlements.size > 0) {
+        setUniqueParticipants(prev => {
+          const allParticipants = Array.from(
+            new Set([...prev, ...Array.from(participantsFromSettlements)])
+          );
+          console.log("精算からの参加者リスト更新:", allParticipants);
+          return allParticipants;
+        });
+      }
+    }
+  }, [settlements]);
   
   const isLoading = eventLoading || expensesLoading || settlementsLoading;
   
@@ -337,15 +362,28 @@ export default function ExpenseSplitting() {
                         .then(data => {
                           // 成功した場合の処理
                           // 新しい参加者をローカルの状態に追加
-                          setUniqueParticipants([...uniqueParticipants, trimmedName]);
+                          setUniqueParticipants(prev => {
+                            // 明示的に新しい配列を作成して状態更新を強制
+                            const newParticipants = [...prev, trimmedName];
+                            console.log("参加者リスト更新:", newParticipants);
+                            return newParticipants;
+                          });
+                          
                           // 入力フィールドをクリア
                           setNewParticipantName('');
                           // 新規追加モードを終了
                           setIsAddingNewPayer(false);
                           
-                          // 精算データを更新（新メンバーが「全員で割り勘」に含まれるようにするため）
+                          // 精算データと参加者リストを更新
                           queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
-                          queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
+                          queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/attendances`] });
+                          
+                          // 参加者追加後に数秒待ってから精算情報を再取得（参加者更新を反映させるため）
+                          setTimeout(() => {
+                            queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
+                            // 明示的に再取得
+                            refetchSettlements();
+                          }, 500);
                           
                           // 通知
                           toast({
