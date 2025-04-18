@@ -60,6 +60,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      // 参加者を登録（もし指定されていれば）
+      let participantCount = 0;
+      if (req.body.participants && Array.isArray(req.body.participants)) {
+        await Promise.all(
+          req.body.participants.map(async (name: string) => {
+            const attendanceId = nanoid();
+            await storage.createAttendance({
+              id: attendanceId,
+              eventId,
+              name,
+            });
+            participantCount++;
+          })
+        );
+        
+        // 参加者数を更新
+        if (participantCount > 0) {
+          await storage.updateEvent(eventId, {
+            participantsCount: participantCount,
+          });
+        }
+      }
+      
       res.status(201).json({ 
         ...event, 
         dateOptions 

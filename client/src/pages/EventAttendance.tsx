@@ -31,14 +31,26 @@ export default function EventAttendance() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [isIdentificationOpen, setIsIdentificationOpen] = useState(true);
+  const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [participantName, setParticipantName] = useState<string>('');
   const [responses, setResponses] = useState<DateResponse[]>([]);
+  const [attendances, setAttendances] = useState<{id: string, name: string}[]>([]);
   
-  const { data: event, isLoading } = useQuery<Event>({
+  const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: [`/api/events/${id}`],
   });
+  
+  const { data: attendancesList, isLoading: attendancesLoading } = useQuery<any[]>({
+    queryKey: [`/api/events/${id}/attendances`],
+    onSuccess: (data) => {
+      if (data) {
+        setAttendances(data.map(item => ({ id: item.id, name: item.name })));
+      }
+    }
+  });
+  
+  const isLoading = eventLoading || attendancesLoading;
   
   // Set default responses when event data loads
   useEffect(() => {
@@ -194,13 +206,69 @@ export default function EventAttendance() {
           </AlertDescription>
         </Alert>
       ) : (
-        <Alert className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>出欠回答</AlertTitle>
-          <AlertDescription>
-            以下の候補日から参加可能な日程を選択してください。
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>出欠回答</AlertTitle>
+            <AlertDescription>
+              以下の候補日から参加可能な日程を選択してください。
+            </AlertDescription>
+          </Alert>
+          
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>参加者を選択</CardTitle>
+              <CardDescription>
+                既に登録されている参加者から選択するか、新しい参加者として回答してください。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {attendances && attendances.length > 0 ? (
+                <div>
+                  <div className="mb-4">
+                    <h3 className="font-medium mb-2">登録済み参加者</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {attendances.map((attendance) => (
+                        <Button 
+                          key={attendance.id} 
+                          variant="outline"
+                          className="hover:bg-primary/10"
+                          onClick={() => {
+                            setParticipantId(attendance.id);
+                            setParticipantName(attendance.name);
+                            
+                            // ここで既存の回答を取得するロジックがあると理想的
+                            toast({
+                              title: "参加者を選択しました",
+                              description: `${attendance.name}さんとして回答します`,
+                            });
+                          }}
+                        >
+                          {attendance.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center my-4">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <div className="px-2 text-slate-500 text-sm">または</div>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+                </div>
+              ) : null}
+              
+              <div>
+                <h3 className="font-medium mb-2">新しい参加者として回答</h3>
+                <Button 
+                  variant="default" 
+                  onClick={() => setIsIdentificationOpen(true)}
+                >
+                  新しい参加者として回答する
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
       
       <form onSubmit={handleSubmit}>

@@ -37,6 +37,8 @@ export default function CreateEvent() {
   const [creatorName, setCreatorName] = useState('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [newParticipant, setNewParticipant] = useState('');
   
   // デフォルト時間設定
   const [defaultStartTime, setDefaultStartTime] = useState('19:00');
@@ -118,13 +120,20 @@ export default function CreateEvent() {
       useDefaultTime: option.useDefaultTime
     }));
     
+    // 作成者を参加者リストに追加（まだリストになければ）
+    let allParticipants = [...participants];
+    if (!allParticipants.includes(creatorName)) {
+      allParticipants.unshift(creatorName);
+    }
+    
     createEventMutation.mutate({
       title,
       description,
       creatorName,
       defaultStartTime,
       defaultEndTime,
-      dateOptions: formattedDateOptions
+      dateOptions: formattedDateOptions,
+      participants: allParticipants
     });
   };
   
@@ -170,6 +179,54 @@ export default function CreateEvent() {
                 placeholder="例: 田中 健太" 
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>参加予定者</Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={newParticipant} 
+                  onChange={(e) => setNewParticipant(e.target.value)}
+                  placeholder="参加者名を入力" 
+                />
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => {
+                    if (newParticipant.trim()) {
+                      setParticipants([...participants, newParticipant.trim()]);
+                      setNewParticipant('');
+                    }
+                  }}
+                >
+                  追加
+                </Button>
+              </div>
+              
+              {participants.length > 0 && (
+                <div className="mt-2 bg-slate-50 p-3 rounded-md">
+                  <p className="text-sm text-slate-600 mb-2">参加予定者一覧:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {participants.map((participant, index) => (
+                      <div key={index} className="bg-white px-3 py-1 rounded border flex items-center gap-2">
+                        <span>{participant}</span>
+                        <button 
+                          type="button" 
+                          className="text-slate-400 hover:text-red-500"
+                          onClick={() => {
+                            const newList = [...participants];
+                            newList.splice(index, 1);
+                            setParticipants(newList);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">※イベント作成時に参加者として登録されます</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
