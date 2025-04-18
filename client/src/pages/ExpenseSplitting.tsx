@@ -113,8 +113,21 @@ export default function ExpenseSplitting() {
   
   const addExpenseMutation = useMutation({
     mutationFn: async (data: typeof newExpense) => {
+      // 選択された参加者が空の場合かつ全員選択が有効な場合は、全員割り勘フラグを暗黙的に設定
+      // 今回は空配列を送信することで、サーバー側で「全員割り勘」と認識させる
+      const participants = selectAllParticipants ? [] : data.participants;
+      
+      // APIの実行時にログを出力
+      console.log("支出API実行:", {
+        ...data,
+        participants,
+        amount: parseFloat(data.amount),
+        isAllParticipants: selectAllParticipants
+      });
+      
       const response = await apiRequest('POST', `/api/events/${id}/expenses`, {
         ...data,
+        participants,
         amount: parseFloat(data.amount)
       });
       return response.json();
@@ -179,13 +192,8 @@ export default function ExpenseSplitting() {
       return;
     }
     
-    // participants が空の場合、全参加者を割り勘対象とする
-    const expenseToSubmit = { ...newExpense };
-    if (!expenseToSubmit.participants || expenseToSubmit.participants.length === 0) {
-      expenseToSubmit.participants = [...uniqueParticipants];
-    }
-    
-    addExpenseMutation.mutate(expenseToSubmit);
+    // 元の支出データをそのまま利用する（自動的に全員割り勘になるように修正済み）
+    addExpenseMutation.mutate(newExpense);
   };
   
   const isLoading = eventLoading || expensesLoading || settlementsLoading;
