@@ -9,19 +9,52 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CalendarClock, Loader2, History, Star } from 'lucide-react';
+import { PlusCircle, CalendarClock, Loader2, History, Star, Trash2 } from 'lucide-react';
 import { Event } from '@shared/schema';
 import { formatDate } from '@/lib/utils';
 import { useEffect, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
   });
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   
   // ローカルストレージから参加済みイベントの履歴を取得
   const [recentEvents, setRecentEvents] = useState<{id: string, title: string}[]>([]);
+  
+  // イベント履歴から項目を削除する関数
+  const removeFromHistory = (eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // イベントの伝播を停止（カードのクリックイベントを発火させない）
+    
+    try {
+      // 現在の履歴を取得
+      const storedEvents = localStorage.getItem('recentEvents');
+      if (storedEvents) {
+        // 該当IDのイベントを除外した新しい配列を作成
+        const events = JSON.parse(storedEvents);
+        const updatedEvents = events.filter((e: {id: string}) => e.id !== eventId);
+        
+        // 更新した配列を保存
+        localStorage.setItem('recentEvents', JSON.stringify(updatedEvents));
+        setRecentEvents(updatedEvents);
+        
+        toast({
+          title: "履歴から削除しました",
+          description: "イベントが参加中リストから削除されました",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to remove event from history:', error);
+      toast({
+        title: "エラーが発生しました",
+        description: "削除処理に失敗しました",
+        variant: "destructive"
+      });
+    }
+  };
   
   useEffect(() => {
     // ローカルストレージからユーザーが参加した最近のイベントを取得
@@ -39,7 +72,7 @@ export default function Home() {
     <div className="w-full">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl font-bold text-slate-800 mb-1 sm:hidden">マイイベント</h1>
-        <h1 className="text-xl font-bold text-slate-800 mb-1 hidden sm:block">イベント調整さん</h1>
+        <h1 className="text-xl font-bold text-slate-800 mb-1 hidden sm:block">調整ワリカン</h1>
         <p className="text-sm text-slate-500 hidden sm:block">日程調整と割り勘が簡単に管理できます</p>
       </div>
 
@@ -69,6 +102,13 @@ export default function Home() {
                           </p>
                         </div>
                       </div>
+                      <button 
+                        onClick={(e) => removeFromHistory(event.id, e)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        aria-label="削除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                   <div className="card-content-mobile">
@@ -84,6 +124,15 @@ export default function Home() {
       {/* すべてのイベント */}
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-medium text-slate-800">すべてのイベント</h2>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => navigate('/create')}
+          className="h-8 text-xs px-3 hidden sm:flex"
+        >
+          <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+          予定を作成する
+        </Button>
       </div>
       <div className="space-y-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3 sm:space-y-0">
         {isLoading ? (

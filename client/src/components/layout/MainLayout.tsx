@@ -72,7 +72,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <div className="space-y-2">
               <MobileNavLink href="/" icon={<HomeIcon className="h-5 w-5" />} label="ホーム" isActive={location === '/'} onClick={toggleMenu} />
               <MobileNavLink href="/create" icon={<CalendarClock className="h-5 w-5" />} label="イベントを作成" isActive={location === '/create'} onClick={toggleMenu} />
-              <MobileNavLink href="/" icon={<Users className="h-5 w-5" />} label="参加予定一覧" isActive={false} onClick={toggleMenu} />
             </div>
           </div>
         </div>
@@ -87,7 +86,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around py-2 z-10">
         <NavButton href="/" icon={<HomeIcon size={20} />} label="ホーム" isActive={location === '/'} />
         <NavButton href="/create" icon={<PlusCircle size={20} />} label="作成" isActive={location === '/create'} />
-        <NavButton href="#" icon={<Users size={20} />} label="参加中" isActive={false} />
+        <NavButton href="/" icon={<Users size={20} />} label="参加中" isActive={false} />
       </nav>
     </div>
   );
