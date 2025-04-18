@@ -313,12 +313,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. 仮の参加者を作成（実際のDBには保存されず、計算用）
       const newParticipantsList = [...currentParticipants, validatedData.name];
       
-      // 4. イベントの経費を取得
-      const expenses = await storage.getEventExpenses(req.params.id);
+      // 4. 「全員割り勘」フラグが付いた経費を取得（専用メソッドを使用）
+      const sharedExpenses = await storage.getSharedExpenses(req.params.id);
       
-      // 5. 「全員割り勘」フラグを持つ経費を特定
-      const sharedExpenses = expenses.filter(expense => 
-        expense.isSharedWithAll === true
+      // 5. 念のため、古い形式（フラグなし）の全員割り勘も検出
+      const expenses = await storage.getEventExpenses(req.params.id);
+      const oldStyleSharedExpenses = expenses.filter(expense => 
+        expense.isSharedWithAll !== true && // フラグがない
+        (!expense.participants || expense.participants.length === 0) // かつ参加者が空
       );
       
       console.log(`参加者「${validatedData.name}」を追加します。全員割り勘フラグの経費数: ${sharedExpenses.length}`);
@@ -347,17 +349,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 8. 後方互換性のため、古い支出データもチェック（参加者が空でフラグがない場合）
-      const oldSharedExpenses = expenses.filter(expense => 
-        expense.isSharedWithAll !== true && // 新しいフラグがない
-        (!expense.participants || expense.participants.length === 0) // 参加者が指定されていない
-      );
-      
-      if (oldSharedExpenses.length > 0) {
-        console.log(`後方互換性: 古い形式の「全員割り勘」経費が ${oldSharedExpenses.length}件 見つかりました`);
+      // 8. 古い形式（フラグなし）の全員割り勘支出も更新
+      if (oldStyleSharedExpenses.length > 0) {
+        console.log(`後方互換性: 古い形式の「全員割り勘」経費が ${oldStyleSharedExpenses.length}件 見つかりました`);
         
         // 古い形式の「全員割り勘」も更新
-        for (const expense of oldSharedExpenses) {
+        for (const expense of oldStyleSharedExpenses) {
           console.log(`[後方互換] 支出ID: ${expense.id} を更新中...`);
           
           // 新しいフォーマットに更新
@@ -370,11 +367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 9. 成功レスポンスを返す
+      // 9. 成功レスポンスを返す - 更新された支出総数を返す
+      const totalUpdatedExpenses = sharedExpenses.length + oldStyleSharedExpenses.length;
       res.status(200).json({ 
-        message: "参加者を追加しました",
+        message: `参加者「${validatedData.name}」を追加しました${totalUpdatedExpenses > 0 ? `。${totalUpdatedExpenses}件の全員割り勘も更新しました` : ''}`,
         name: validatedData.name,
-        sharedExpensesUpdated: sharedExpenses.length
+        sharedExpensesUpdated: totalUpdatedExpenses
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

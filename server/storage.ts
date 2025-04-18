@@ -229,9 +229,18 @@ export class MemStorage implements IStorage {
     return this.expenses.get(id);
   }
   
-  async getEventExpenses(eventId: string): Promise<Expense[]> {
+  async getEventExpenses(eventId: string): Promise<(Expense & { isSharedWithAll?: boolean })[]> {
     return Array.from(this.expenses.values())
       .filter(expense => expense.eventId === eventId);
+  }
+  
+  // 全員割り勘フラグを持つ支出のみを取得
+  async getSharedExpenses(eventId: string): Promise<(Expense & { isSharedWithAll?: boolean })[]> {
+    return Array.from(this.expenses.values())
+      .filter(expense => 
+        expense.eventId === eventId && 
+        expense.isSharedWithAll === true
+      );
   }
   
   async deleteExpense(id: string): Promise<void> {
