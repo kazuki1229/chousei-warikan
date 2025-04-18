@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription,
-  CardFooter 
-} from '@/components/ui/card';
+// モバイル最適化のためのUIコンポーネント
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -246,16 +239,16 @@ export default function ExpenseSplitting() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-slate-800 mb-6">{event.title}</h1>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>日程が確定していません</CardTitle>
-            <CardDescription>
+        <div className="mobile-card">
+          <div className="card-header-mobile">
+            <h3 className="text-lg font-medium">日程が確定していません</h3>
+            <p className="text-sm text-slate-500">
               精算機能は日程確定後に利用可能です
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+            </p>
+          </div>
+          <div className="card-content-mobile">
+            <div className="flex flex-col items-center justify-center p-4 text-center">
+              <AlertCircle className="h-10 w-10 text-amber-500 mb-3" />
               <p className="text-slate-600 mb-4">
                 イベントの日程が確定されると、費用の精算機能が利用できるようになります。
               </p>
@@ -263,8 +256,8 @@ export default function ExpenseSplitting() {
                 イベントに戻る
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
