@@ -5,17 +5,34 @@ import {
   CardContent, 
   CardDescription, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CalendarClock, Loader2 } from 'lucide-react';
+import { PlusCircle, CalendarClock, Loader2, History, Star } from 'lucide-react';
 import { Event } from '@shared/schema';
 import { formatDate } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
   });
+  
+  // ローカルストレージから参加済みイベントの履歴を取得
+  const [recentEvents, setRecentEvents] = useState<{id: string, title: string}[]>([]);
+  
+  useEffect(() => {
+    // ローカルストレージからユーザーが参加した最近のイベントを取得
+    try {
+      const storedEvents = localStorage.getItem('recentEvents');
+      if (storedEvents) {
+        setRecentEvents(JSON.parse(storedEvents));
+      }
+    } catch (error) {
+      console.error('Failed to load recent events from localStorage:', error);
+    }
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -29,6 +46,35 @@ export default function Home() {
         </Link>
       </div>
 
+      {/* 最近参加したイベント */}
+      {recentEvents.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-medium text-slate-800 mb-4 flex items-center">
+            <History className="h-5 w-5 mr-2 text-primary/70" />
+            参加中のイベント
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentEvents.map((event) => (
+              <Link key={event.id} href={`/event/${event.id}`}>
+                <Card className="cursor-pointer hover:shadow-md transition-shadow border-primary/20">
+                  <CardContent className="py-4">
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 mr-3 text-amber-500" />
+                      <div>
+                        <h3 className="font-medium">{event.title}</h3>
+                        <p className="text-xs text-slate-500 mt-1">クリックして詳細を表示</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* すべてのイベント */}
+      <h2 className="text-xl font-medium text-slate-800 mb-4">すべてのイベント</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardHeader className="pb-2">

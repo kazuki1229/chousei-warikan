@@ -203,13 +203,36 @@ export default function EventAttendance() {
       <h1 className="text-2xl font-bold text-slate-800 mb-6">{event.title}</h1>
       
       {participantId ? (
-        <Alert className="mb-6 bg-green-50 border-green-200 text-green-800">
-          <Check className="h-4 w-4" />
-          <AlertTitle>回答を受け付けました</AlertTitle>
-          <AlertDescription>
-            {participantName}さん、回答ありがとうございます。以下で回答内容を変更できます。
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert className="mb-6 bg-green-50 border-green-200 text-green-800">
+            <Check className="h-4 w-4" />
+            <AlertTitle>回答を受け付けました</AlertTitle>
+            <AlertDescription>
+              {participantName}さん、回答ありがとうございます。以下で回答内容を変更できます。
+            </AlertDescription>
+          </Alert>
+          
+          <Card className="mb-6">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-slate-800">現在の参加者</h3>
+                  <p className="text-slate-600 text-sm mt-1">{participantName}さんが選択されています</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setParticipantId(null);
+                    setParticipantName('');
+                  }}
+                >
+                  別の参加者を選択
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       ) : (
         <>
           <Alert className="mb-6">

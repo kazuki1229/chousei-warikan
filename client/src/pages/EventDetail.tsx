@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { 
@@ -18,7 +18,8 @@ import {
   ExternalLink, 
   Calculator,
   Check,
-  Loader2
+  Loader2,
+  BookmarkPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import IdentificationDialog from '@/components/IdentificationDialog';
@@ -42,6 +43,44 @@ export default function EventDetail() {
     queryKey: [`/api/events/${id}/attendances`],
     enabled: !!event,
   });
+  
+  // イベントが読み込まれたら、ローカルストレージに保存して「参加中のイベント」として追跡
+  useEffect(() => {
+    if (event) {
+      try {
+        // 既存の参加中イベントを取得
+        const storedEvents = localStorage.getItem('recentEvents');
+        let recentEvents: {id: string, title: string}[] = [];
+        
+        if (storedEvents) {
+          recentEvents = JSON.parse(storedEvents);
+        }
+        
+        // 既に存在するかチェック
+        const existingIndex = recentEvents.findIndex(e => e.id === id);
+        if (existingIndex !== -1) {
+          // 既に存在する場合は削除（後で先頭に追加するため）
+          recentEvents.splice(existingIndex, 1);
+        }
+        
+        // 先頭に追加
+        recentEvents.unshift({
+          id: id || '',
+          title: event.title
+        });
+        
+        // 最大10件まで保持
+        if (recentEvents.length > 10) {
+          recentEvents = recentEvents.slice(0, 10);
+        }
+        
+        // 保存
+        localStorage.setItem('recentEvents', JSON.stringify(recentEvents));
+      } catch (error) {
+        console.error('Failed to save recent events to localStorage:', error);
+      }
+    }
+  }, [event, id]);
   
   const finalizeEventMutation = useMutation({
     mutationFn: async (dateOptionId: string) => {
@@ -123,21 +162,34 @@ export default function EventDetail() {
   
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/')}
+            className="text-slate-500 hover:text-slate-700 px-2 -ml-2"
+          >
+            ← 戻る
+          </Button>
           <h1 className="text-2xl font-bold text-slate-800">{event.title}</h1>
-          <p className="text-slate-500">作成者: {event.creatorName}</p>
         </div>
-        
-        <div className="flex gap-2 mt-4 md:mt-0">
-          <Button variant="outline" onClick={copyUrlToClipboard} className="flex items-center gap-2">
-            <Share2 className="h-4 w-4" />
-            共有
-          </Button>
-          <Button onClick={() => setIsIdentificationOpen(true)} className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4" />
-            出欠を入力
-          </Button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <p className="text-slate-500">作成者: {event.creatorName}</p>
+          
+          <div className="flex gap-2 mt-4 md:mt-0">
+            <Button variant="outline" onClick={copyUrlToClipboard} className="flex items-center gap-2">
+              <Share2 className="h-4 w-4" />
+              共有
+            </Button>
+            <Button 
+              onClick={() => navigate(`/event/${id}/attendance`)} 
+              className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90"
+            >
+              <ExternalLink className="h-4 w-4" />
+              出欠を入力
+            </Button>
+          </div>
         </div>
       </div>
       
