@@ -86,7 +86,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around py-2 z-10">
         <NavButton href="/" icon={<HomeIcon size={20} />} label="ホーム" isActive={location === '/'} />
         <NavButton href="/create" icon={<PlusCircle size={20} />} label="作成" isActive={location === '/create'} />
-        <NavButton href="/" icon={<Users size={20} />} label="参加中" isActive={false} />
       </nav>
     </div>
   );
@@ -126,7 +125,7 @@ const MobileNavLink = ({ href, icon, label, isActive, onClick }: { href: string,
 // Bottom Navigation Button for Mobile
 const NavButton = ({ href, icon, label, isActive }: { href: string, icon: React.ReactNode, label: string, isActive: boolean }) => (
   <div 
-    className="flex flex-col items-center justify-center px-2 cursor-pointer"
+    className="flex flex-col items-center justify-center w-1/2 cursor-pointer"
     onClick={() => window.location.href = href}
   >
     <div className={`p-1 rounded-full ${isActive ? 'text-primary' : 'text-slate-600'}`}>
