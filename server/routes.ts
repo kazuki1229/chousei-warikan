@@ -484,6 +484,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("▶ 割り勘計算ロジックを実行...");
       console.log(`イベント参加者数: ${mergedParticipants.length}人`);
       
+      // 全ての支出に参加者リストをマージして、全員に対応できるようにする
+      for (const expense of expenses) {
+        // isSharedWithAll フラグが明示的にtrueに設定されているものは、
+        // 現在の全参加者に対して計算する必要がある
+        if (expense.isSharedWithAll === true) {
+          console.log(`支出 ${expense.id} は全員割り勘フラグがあるため、参加者リストを更新します`);
+          console.log(`更新前: ${expense.participants ? expense.participants.length : 0}人`);
+          
+          // 参加者リストを最新の状態に更新（イベント全体の参加者リストを使用）
+          expense.participants = [...mergedParticipants];
+          
+          console.log(`更新後: ${expense.participants.length}人`);
+        }
+        else if (!expense.participants || expense.participants.length === 0) {
+          // 後方互換性: 古い形式の全員割り勘は、参加者が空の場合
+          console.log(`支出 ${expense.id} は参加者が未指定のため全員割り勘と判断します`);
+          expense.participants = [...mergedParticipants];
+          expense.isSharedWithAll = true;
+        }
+      }
+      
       // 精算計算を実行
       const settlements = calculateSettlements(expenses);
       res.json(settlements);
