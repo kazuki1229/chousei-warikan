@@ -58,17 +58,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           onClick={e => e.stopPropagation()}
         >
           <div className="p-4">
-            <div 
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-4 rounded-md flex items-center justify-center mb-6 cursor-pointer" 
-              onClick={() => {
-                toggleMenu();
-                window.location.href = '/create';
-              }}
-            >
-              <PlusCircle className="mr-1 h-4 w-4" />
-              新しいイベントを作成
-            </div>
-            
             <div className="space-y-2">
               <MobileNavLink href="/" icon={<HomeIcon className="h-5 w-5" />} label="ホーム" isActive={location === '/'} onClick={toggleMenu} />
               <MobileNavLink href="/create" icon={<CalendarClock className="h-5 w-5" />} label="イベントを作成" isActive={location === '/create'} onClick={toggleMenu} />
