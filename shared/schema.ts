@@ -8,11 +8,12 @@ export const events = pgTable("events", {
   title: text("title").notNull(),
   description: text("description"),
   creatorName: text("creator_name").notNull(),
-  creatorEmail: text("creator_email").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   selectedDate: text("selected_date"),
   startTime: text("start_time"),
   endTime: text("end_time"),
+  defaultStartTime: text("default_start_time"),
+  defaultEndTime: text("default_end_time"),
   participantsCount: integer("participants_count").default(0),
 });
 
@@ -30,7 +31,6 @@ export const attendances = pgTable("attendances", {
   id: text("id").primaryKey().notNull(),
   eventId: text("event_id").notNull().references(() => events.id),
   name: text("name").notNull(),
-  email: text("email").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -56,7 +56,6 @@ export const expenses = pgTable("expenses", {
 export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
   createdAt: true,
-  participantsCount: true,
 });
 
 export const insertDateOptionSchema = createInsertSchema(dateOptions).omit({

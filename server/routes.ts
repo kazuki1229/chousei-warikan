@@ -18,11 +18,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: z.string().min(1, "タイトルを入力してください"),
         description: z.string().optional(),
         creatorName: z.string().min(1, "お名前を入力してください"),
-        creatorEmail: z.string().email("有効なメールアドレスを入力してください"),
+        defaultStartTime: z.string().min(1, "デフォルト開始時間を入力してください"),
+        defaultEndTime: z.string().min(1, "デフォルト終了時間を入力してください"),
         dateOptions: z.array(z.object({
           date: z.string(), // yyyy-MM-dd format
-          startTime: z.string(), // HH:mm format
-          endTime: z.string(), // HH:mm format
+          startTime: z.string().optional(), // HH:mm format, optional if using default
+          endTime: z.string().optional(), // HH:mm format, optional if using default
+          useDefaultTime: z.boolean().default(true)
         })).min(1, "少なくとも1つの日程を選択してください"),
       });
 
@@ -37,20 +39,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: validatedData.title,
         description: validatedData.description || "",
         creatorName: validatedData.creatorName,
-        creatorEmail: validatedData.creatorEmail,
+        defaultStartTime: validatedData.defaultStartTime,
+        defaultEndTime: validatedData.defaultEndTime,
       });
       
       // Create date options
       const dateOptions = await Promise.all(
-        validatedData.dateOptions.map(option => 
-          storage.createDateOption({
+        validatedData.dateOptions.map(option => {
+          // 個別の時間設定がない場合はデフォルト時間を使用
+          const startTime = option.useDefaultTime ? validatedData.defaultStartTime : (option.startTime || validatedData.defaultStartTime);
+          const endTime = option.useDefaultTime ? validatedData.defaultEndTime : (option.endTime || validatedData.defaultEndTime);
+          
+          return storage.createDateOption({
             id: nanoid(),
             eventId: eventId,
             date: option.date,
-            startTime: option.startTime,
-            endTime: option.endTime,
-          })
-        )
+            startTime,
+            endTime,
+          });
+        })
       );
       
       res.status(201).json({ 
@@ -130,7 +137,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({
         name: z.string().min(1, "お名前を入力してください"),
-        email: z.string().email("有効なメールアドレスを入力してください"),
         responses: z.array(z.object({
           dateOptionId: z.string(),
           status: z.enum(["available", "maybe", "unavailable"]),
@@ -144,39 +150,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "イベントが見つかりません" });
       }
       
-      // Check if this person has already responded
-      const existingAttendance = await storage.getAttendanceByEmail(req.params.id, validatedData.email);
+      // 新しい出席情報を作成
+      const attendanceId = nanoid();
+      const attendance = await storage.createAttendance({
+        id: attendanceId,
+        eventId: req.params.id,
+        name: validatedData.name,
+      });
       
-      let attendance;
-      if (existingAttendance) {
-        // Update existing responses
-        await storage.updateAttendanceResponses(existingAttendance.id, validatedData.responses);
-        attendance = existingAttendance;
-      } else {
-        // Create new attendance
-        attendance = await storage.createAttendance({
-          id: nanoid(),
-          eventId: req.params.id,
-          name: validatedData.name,
-          email: validatedData.email,
-        });
-        
-        // Create responses
-        await Promise.all(
-          validatedData.responses.map(response => 
-            storage.createAttendanceResponse({
-              attendanceId: attendance.id,
-              dateOptionId: response.dateOptionId,
-              status: response.status,
-            })
-          )
-        );
-        
-        // Update participant count
-        await storage.updateEvent(req.params.id, {
-          participantsCount: (event.participantsCount || 0) + 1,
-        });
-      }
+      // Create responses
+      await Promise.all(
+        validatedData.responses.map(response => 
+          storage.createAttendanceResponse({
+            attendanceId: attendanceId,
+            dateOptionId: response.dateOptionId,
+            status: response.status,
+          })
+        )
+      );
+      
+      // Update participant count
+      await storage.updateEvent(req.params.id, {
+        participantsCount: (event.participantsCount || 0) + 1,
+      });
       
       res.status(201).json(attendance);
     } catch (error) {
@@ -223,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eventId: req.params.id,
         payerName: validatedData.payerName,
         description: validatedData.description,
-        amount: validatedData.amount,
+        amount: String(validatedData.amount),
       });
       
       res.status(201).json(expense);

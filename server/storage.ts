@@ -146,18 +146,8 @@ export class MemStorage implements IStorage {
   }
   
   async getAttendanceByEmail(eventId: string, email: string): Promise<Attendance | undefined> {
-    const attendance = Array.from(this.attendances.values())
-      .find(a => a.eventId === eventId && a.email.toLowerCase() === email.toLowerCase());
-    
-    if (!attendance) return undefined;
-    
-    // Get responses for this attendance
-    const responses = await this.getAttendanceResponses(attendance.id);
-    
-    return {
-      ...attendance,
-      responses,
-    };
+    // メールアドレスを使用しなくなったため、この関数は常にundefinedを返す
+    return undefined;
   }
   
   async getEventAttendances(eventId: string): Promise<Attendance[]> {
