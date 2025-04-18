@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { 
   Card, 
   CardContent, 
@@ -37,15 +37,20 @@ export default function Home() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-slate-800 mb-4 md:mb-0">イベント調整さん</h1>
-        <Button 
-          className="flex items-center gap-2"
-          onClick={() => navigate('/create')}
-        >
-          <PlusCircle className="h-4 w-4" />
-          新しい予定を作成
-        </Button>
+      <div className="mb-8 pb-4 border-b">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">イベント調整さん</h1>
+            <p className="text-slate-500 mt-1">日程調整と割り勘が簡単に管理できます</p>
+          </div>
+          <Button 
+            className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90"
+            onClick={() => navigate('/create')}
+          >
+            <PlusCircle className="h-4 w-4" />
+            新しい予定を作成
+          </Button>
+        </div>
       </div>
 
       {/* 最近参加したイベント */}
@@ -57,16 +62,27 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentEvents.map((event) => (
-              <div key={event.id} onClick={() => navigate(`/event/${event.id}`)}>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow border-primary/20">
-                  <CardContent className="py-4">
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 mr-3 text-amber-500" />
+              <div 
+                key={event.id} 
+                onClick={() => navigate(`/event/${event.id}`)}
+                className="cursor-pointer"
+              >
+                <Card className="hover:shadow-md transition-shadow h-full border-primary/20">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-medium">{event.title}</h3>
-                        <p className="text-xs text-slate-500 mt-1">クリックして詳細を表示</p>
+                        <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 text-amber-500" />
+                          <CardDescription className="line-clamp-1">
+                            参加中
+                          </CardDescription>
+                        </div>
                       </div>
                     </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xs text-primary flex justify-end">続きを表示</div>
                   </CardContent>
                 </Card>
               </div>
@@ -76,26 +92,18 @@ export default function Home() {
       )}
       
       {/* すべてのイベント */}
-      <h2 className="text-xl font-medium text-slate-800 mb-4">すべてのイベント</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-medium text-slate-800">すべてのイベント</h2>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => navigate('/create')}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          新しいイベント
+        </Button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-primary">新しい予定</CardTitle>
-            <CardDescription>簡単に日程調整と割り勘を管理</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-24 flex items-center justify-center">
-              <Button 
-                variant="outline" 
-                className="border-primary/30 hover:bg-primary/10"
-                onClick={() => navigate('/create')}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                予定を作成する
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {isLoading ? (
           <Card>
@@ -110,23 +118,35 @@ export default function Home() {
               onClick={() => navigate(`/event/${event.id}`)}
               className="cursor-pointer"
             >
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{event.title}</CardTitle>
-                  <CardDescription>
-                    作成者: {event.creatorName}
-                  </CardDescription>
+              <Card className="hover:shadow-md transition-shadow h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg line-clamp-1">{event.title}</CardTitle>
+                      <CardDescription className="line-clamp-1">
+                        作成者: {event.creatorName}
+                      </CardDescription>
+                    </div>
+                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${event.selectedDate ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    <div className="text-sm text-slate-500 flex items-center">
-                      <CalendarClock className="h-4 w-4 mr-2 text-primary/70" />
-                      {event.selectedDate 
-                        ? `確定日: ${formatDate(new Date(event.selectedDate))}` 
-                        : '日程調整中'}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-slate-700">
+                        <CalendarClock className="h-4 w-4 mr-2 text-primary/70" />
+                        <span className="font-medium">
+                          {event.selectedDate 
+                            ? `確定: ${formatDate(new Date(event.selectedDate))}` 
+                            : '日程調整中'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm text-slate-500">
-                      参加者: {event.participantsCount || 0}人
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="text-sm text-slate-500">
+                        参加者: {event.participantsCount || 0}人
+                      </div>
+                      <div className="text-xs text-primary">詳細を表示</div>
                     </div>
                   </div>
                 </CardContent>
@@ -137,12 +157,14 @@ export default function Home() {
           <Card>
             <CardContent className="h-40 flex flex-col items-center justify-center text-center p-6">
               <p className="text-slate-500 mb-4">予定がまだありません</p>
-              <Link href="/create">
-                <Button variant="outline" size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  予定を作成する
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/create')}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                予定を作成する
+              </Button>
             </CardContent>
           </Card>
         )}
