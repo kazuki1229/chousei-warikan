@@ -24,7 +24,8 @@ import {
   Calculator, 
   Plus, 
   Trash2, 
-  ArrowLeftRight, 
+  ArrowLeftRight,
+  ArrowRight,
   AlertCircle,
   Loader2,
   Users,
@@ -248,13 +249,14 @@ export default function ExpenseSplitting() {
         {event.title} - 費用精算
       </h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">総支払額</CardTitle>
+            <CardTitle className="text-lg">記録された支払額</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{formatCurrency(totalExpenses)}</p>
+            <p className="text-xs text-slate-500 mt-1">すべての支払いの合計金額</p>
           </CardContent>
         </Card>
         
@@ -264,15 +266,7 @@ export default function ExpenseSplitting() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{participantCount}人</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">一人あたり</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(perPersonAmount)}</p>
+            <p className="text-xs text-slate-500 mt-1">このイベントの全参加メンバー</p>
           </CardContent>
         </Card>
       </div>

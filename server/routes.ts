@@ -326,7 +326,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     
     // 割り勘参加者を追加
     if (expense.participants && expense.participants.length > 0) {
-      expense.participants.forEach(p => allParticipants.add(p));
+      expense.participants.forEach((p: string) => allParticipants.add(p));
     }
   });
   
