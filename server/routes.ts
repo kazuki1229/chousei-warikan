@@ -250,13 +250,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "イベントの日程が確定していないため、精算機能は利用できません" });
       }
       
+      // 「全員で割り勘」の場合、明示的に全参加者を設定する
+      let participants = validatedData.participants;
+      if (!participants || participants.length === 0) {
+        // 全参加者を取得して設定する
+        const allParticipants = await storage.getEventParticipants(req.params.id);
+        console.log(`「全員で割り勘」設定のため、${allParticipants.length}人全員を明示的に参加者として設定します`);
+        participants = allParticipants;
+      }
+      
       const expense = await storage.createExpense({
         id: nanoid(),
         eventId: req.params.id,
         payerName: validatedData.payerName,
         description: validatedData.description,
         amount: String(validatedData.amount),
-        participants: validatedData.participants,
+        participants: participants,
       });
       
       res.status(201).json(expense);
@@ -311,15 +320,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 6. イベントに参加者として追加
       // (仮想的には既に参加者リストに追加されている扱いでよい)
       
-      // 7. 「全員割り勘」になっている支出がある場合、recalculate の処理を行う
+      // 7. 「全員割り勘」になっている支出がある場合、データベースの支出データを更新
       if (sharedExpenses.length > 0) {
-        console.log("「全員割り勘」の経費を再計算します");
+        console.log(`「全員割り勘」の経費 ${sharedExpenses.length}件を更新します`);
         
-        // 今回の操作は精算計算だけが目的で実際のDBは変更しない
-        // この更新は expenses の再取得で参加者リストが更新されるため影響しない
-        
-        // 8. 新しい参加者は自動的に「全員で割り勘」の経費に追加される
-        // calculateSettlements 関数内で全参加者リストが使用される
+        // 1. 既存の「全員割り勘」支出を特定し、更新
+        for (const expense of sharedExpenses) {
+          console.log(`支出ID: ${expense.id}, 項目: ${expense.description}, ` +
+                     `金額: ${expense.amount}円 を更新中...`);
+          
+          // 2. 支出データに新しい参加者のデータを追加
+          if (!expense.participants) {
+            expense.participants = [];
+          }
+          
+          // 3. 明示的に全員を参加者として設定
+          // 注: 将来的に参加者が除外された場合にも対応できるよう、
+          // その時点での参加者リストを明示的に設定しておく
+          await storage.updateExpense(expense.id, {
+            participants: newParticipantsList
+          });
+          
+          console.log(`支出ID: ${expense.id} の参加者を ${newParticipantsList.length}人に更新しました`);
+        }
       }
       
       // 9. 成功レスポンスを返す
@@ -438,8 +461,10 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
       console.log(`明示的に指定された参加者: ${splitParticipants.join(', ')}`);
     } else {
       // 「全員で割り勘」のケース - 現在の全参加者で分ける
+      // この処理は互換性のため残しているが、基本的に新しいコードでは
+      // 全員で割り勘でも明示的に参加者リストを設定するようになっている
       splitParticipants = [...allCurrentParticipants];
-      console.log(`全員で割り勘: ${splitParticipants.length}人`);
+      console.log(`全員で割り勘 (暗黙): ${splitParticipants.length}人`);
     }
     
     console.log(`分担者(${splitParticipants.length}人): ${splitParticipants.join(', ')}`);
