@@ -314,144 +314,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function calculateSettlements(expenses: any[]): { from: string; to: string; amount: number }[] {
   if (!expenses.length) return [];
   
-  // テストケース用ロジック
-  // サーバーコンソールに計算過程を表示（デバッグ用）
+  // 計算過程をデバッグログに出力
   console.log("========== 精算計算開始 ==========");
   
-  // 1. 全ての参加者を集める
-  const participants = new Set<string>();
+  // 1. 全ての参加者を集める（支払者と分担者の両方）
+  const participantsSet = new Set<string>();
   
   expenses.forEach(expense => {
     // 支払者を追加
-    participants.add(expense.payerName);
+    participantsSet.add(expense.payerName);
     
     // 参加者リストを追加
     if (expense.participants && expense.participants.length > 0) {
-      expense.participants.forEach((p: string) => participants.add(p));
+      expense.participants.forEach((p: string) => participantsSet.add(p));
     } else {
-      // 参加者が指定されていない場合、その時点で登録されている全員を追加
+      // 参加者が指定されていない場合は全ての支払者を参加者とみなす
+      expenses.forEach(e => participantsSet.add(e.payerName));
     }
   });
   
-  // 参加者の名前を配列に変換
-  const participantList = Array.from(participants);
+  // 参加者リストを配列に変換
+  const participants = Array.from(participantsSet);
+  console.log("参加者リスト:", participants);
   
-  console.log("参加者リスト:", participantList);
+  // 2. 各参加者の支払い金額と負担額を計算
+  const balanceSheet: { [name: string]: { paid: number, shouldPay: number } } = {};
   
-  // 2. 各参加者の支払い金額と負担金額を計算
-  const balanceData: { [key: string]: { paid: number, shouldPay: number } } = {};
-  
-  // 初期化
-  participantList.forEach(name => {
-    balanceData[name] = { paid: 0, shouldPay: 0 };
+  // バランスシートを初期化
+  participants.forEach(name => {
+    balanceSheet[name] = { paid: 0, shouldPay: 0 };
   });
   
-  // 各支出を処理して支払い額/負担額を計算
+  // 各支出を処理
   expenses.forEach(expense => {
-    const amount = Math.round(Number(expense.amount)); // 円単位なので整数に
+    const amount = Number(expense.amount);
     const payerName = expense.payerName;
     
     console.log(`\n支払い: ${payerName}が${amount}円を支払い`);
     
-    // 支払者の支払額を加算
-    balanceData[payerName].paid += amount;
+    // 支払者の支払額に加算
+    balanceSheet[payerName].paid += amount;
     
-    // 分割対象者を決定
-    let splitTargets: string[];
+    // 分担者を決定
+    let splitParticipants: string[];
     
     if (expense.participants && expense.participants.length > 0) {
-      // 特定の参加者間で分割
-      splitTargets = expense.participants;
-      console.log(`分担者: ${splitTargets.join(', ')}`);
+      // 特定の参加者で分割
+      splitParticipants = expense.participants;
+      console.log(`分担者: ${splitParticipants.join(', ')}`);
     } else {
       // 全員で分割
-      splitTargets = participantList;
-      console.log(`分担者: 全員 (${splitTargets.join(', ')})`);
+      splitParticipants = participants;
+      console.log(`分担者: 全員 (${splitParticipants.join(', ')})`);
     }
     
-    // 一人あたりの金額計算（小数点以下切り捨て）
-    const perPersonAmount = Math.floor(amount / splitTargets.length);
-    // 余りの計算
-    const remainder = amount - (perPersonAmount * splitTargets.length);
+    // 一人あたりの負担額計算（均等割り）
+    const perPersonBase = Math.floor(amount / splitParticipants.length);
+    const remainder = amount - (perPersonBase * splitParticipants.length);
     
-    console.log(`一人当たり基本金額: ${perPersonAmount}円, 端数: ${remainder}円`);
+    console.log(`一人当たり基本金額: ${perPersonBase}円, 端数: ${remainder}円`);
     
-    // 各参加者の負担額を加算
-    splitTargets.forEach((person, index) => {
-      // 基本金額を負担額に加算
-      let personShare = perPersonAmount;
+    // 各参加者の負担額を計算
+    splitParticipants.forEach((person, index) => {
+      // 基本負担額
+      let personShare = perPersonBase;
       
       // 端数処理: 先頭から remainder 人に 1円ずつ追加
       if (index < remainder) {
         personShare += 1;
       }
       
-      balanceData[person].shouldPay += personShare;
+      balanceSheet[person].shouldPay += personShare;
       console.log(`${person}の負担額: ${personShare}円`);
     });
   });
   
+  // 3. 各参加者の最終的な収支を計算
   console.log("\n===== 各参加者の収支 =====");
+  console.log("名前\t支払合計\t負担合計\t差額");
   
-  // 3. 最終的な貸し借り計算
-  const settlements: { from: string; to: string; amount: number }[] = [];
-  
-  // 各参加者の貸し借り状況を計算
   const balances: { name: string, balance: number }[] = [];
   
-  // テスト用に表形式でデータを整形
-  console.log("名前\t支払合計\t本来の負担\t差額");
-  
-  Object.entries(balanceData).forEach(([name, data]) => {
+  participants.forEach(name => {
+    const data = balanceSheet[name];
     const balance = data.paid - data.shouldPay; // プラスなら貸し、マイナスなら借り
     balances.push({ name, balance });
     
-    // デバッグ用に表形式出力
+    // 収支表示
     console.log(`${name}\t${data.paid}円\t${data.shouldPay}円\t${balance > 0 ? '+' : ''}${balance}円`);
   });
   
+  // 4. 精算の組み合わせを作成
   console.log("\n===== 精算指示 =====");
   
-  // 支払う人と受け取る人に分ける
-  const debtors = balances.filter(p => p.balance < 0).map(p => ({ name: p.name, amount: -p.balance }));
-  const creditors = balances.filter(p => p.balance > 0).map(p => ({ name: p.name, amount: p.balance }));
+  // 貸し手と借り手に分ける
+  const creditors = balances.filter(p => p.balance > 0).sort((a, b) => b.balance - a.balance); // 貸し手（受け取る人）
+  const debtors = balances.filter(p => p.balance < 0).sort((a, b) => a.balance - b.balance);  // 借り手（支払う人）
   
-  // 精算金額の合計をチェック（デバッグ用）
-  const totalDebts = debtors.reduce((sum, d) => sum + d.amount, 0);
-  const totalCredits = creditors.reduce((sum, c) => sum + c.amount, 0);
-  console.log(`支払う側の合計: ${totalDebts}円, 受け取る側の合計: ${totalCredits}円`);
+  // 精算指示
+  const settlements: { from: string; to: string; amount: number }[] = [];
   
-  if (Math.abs(totalDebts - totalCredits) > 1) {
-    console.log("警告: 貸し借りの合計に誤差があります");
-  }
+  // 検証用
+  const totalCredits = creditors.reduce((sum, c) => sum + c.balance, 0);
+  const totalDebts = debtors.reduce((sum, d) => sum + Math.abs(d.balance), 0);
+  console.log(`受け取る側の合計: ${totalCredits}円, 支払う側の合計: ${totalDebts}円`);
   
-  // 貸し借りの組み合わせを作成
-  while (debtors.length > 0 && creditors.length > 0) {
-    const debtor = debtors[0]; // 借りている人（支払う人）
-    const creditor = creditors[0]; // 貸している人（受け取る人）
+  // 各借り手について処理
+  for (const debtor of [...debtors]) {
+    let remainingDebt = Math.abs(debtor.balance);
     
-    // どちらか少ない方の金額で精算
-    const settleAmount = Math.min(debtor.amount, creditor.amount);
-    
-    if (settleAmount > 0) {
-      // 精算: 借りている人 → 貸している人
-      const settlement = {
-        from: debtor.name,
-        to: creditor.name,
-        amount: Math.round(settleAmount) // 整数にする
-      };
+    // 各貸し手に対して精算
+    for (let i = 0; i < creditors.length; i++) {
+      if (remainingDebt <= 0) break;
       
-      settlements.push(settlement);
-      console.log(`${settlement.from} → ${settlement.to}: ${settlement.amount}円`);
+      const creditor = creditors[i];
+      if (creditor.balance <= 0) continue; // 既に精算済みの場合スキップ
+      
+      // 精算額を計算（どちらか小さい方）
+      const settleAmount = Math.min(remainingDebt, creditor.balance);
+      
+      if (settleAmount > 0) {
+        // 精算指示を追加
+        settlements.push({
+          from: debtor.name,
+          to: creditor.name,
+          amount: settleAmount
+        });
+        
+        console.log(`${debtor.name} → ${creditor.name}: ${settleAmount}円`);
+        
+        // 残額を更新
+        remainingDebt -= settleAmount;
+        creditor.balance -= settleAmount;
+      }
     }
-    
-    // 金額を更新
-    debtor.amount -= settleAmount;
-    creditor.amount -= settleAmount;
-    
-    // 0になった人を配列から削除
-    if (debtor.amount < 0.01) debtors.shift();
-    if (creditor.amount < 0.01) creditors.shift();
   }
   
   console.log("========== 精算計算終了 ==========\n");

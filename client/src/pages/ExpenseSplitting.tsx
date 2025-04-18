@@ -362,10 +362,15 @@ export default function ExpenseSplitting() {
                     id="amount"
                     className="pl-8"
                     value={newExpense.amount}
-                    onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                    onChange={(e) => {
+                      // 数字以外を削除し、整数値のみ許可
+                      const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                      setNewExpense({...newExpense, amount: numericValue});
+                    }}
                     placeholder="10000"
-                    type="number"
-                    min="1"
+                    type="text"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
                     required
                   />
                 </div>
