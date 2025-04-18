@@ -268,11 +268,92 @@ export default function ExpenseSplitting() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">参加人数</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg">参加人数</CardTitle>
+              {isAddingNewPayer ? (
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setIsAddingNewPayer(false)}
+                >
+                  キャンセル
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddingNewPayer(true)}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  新規追加
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{participantCount}人</p>
-            <p className="text-xs text-slate-500 mt-1">このイベントの全参加メンバー</p>
+            {isAddingNewPayer ? (
+              <div className="space-y-3">
+                <Input
+                  value={newExpense.payerName}
+                  onChange={(e) => setNewExpense({...newExpense, payerName: e.target.value})}
+                  placeholder="新しい参加者の名前"
+                  className="w-full"
+                />
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => {
+                    if (newExpense.payerName.trim()) {
+                      // 既存の参加者と重複していないか確認
+                      if (!uniqueParticipants.includes(newExpense.payerName.trim())) {
+                        const newParticipantName = newExpense.payerName.trim();
+                        // 新しい参加者を追加
+                        setUniqueParticipants([...uniqueParticipants, newParticipantName]);
+                        // 入力フィールドをクリア
+                        setNewExpense({...newExpense, payerName: ''});
+                        // 新規追加モードを終了
+                        setIsAddingNewPayer(false);
+                        // 通知
+                        toast({
+                          title: "参加者を追加しました",
+                          description: `${newParticipantName}さんが参加者リストに追加されました`,
+                        });
+                      } else {
+                        toast({
+                          title: "参加者が重複しています",
+                          description: "この名前の参加者は既に登録されています",
+                          variant: "destructive"
+                        });
+                      }
+                    } else {
+                      toast({
+                        title: "名前を入力してください",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  追加する
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="text-2xl font-bold">{participantCount}人</p>
+                <p className="text-xs text-slate-500 mt-1">このイベントの全参加メンバー</p>
+                {participantCount > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {uniqueParticipants.map(name => (
+                      <span key={name} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -290,57 +371,21 @@ export default function ExpenseSplitting() {
               <div className="space-y-2">
                 <Label htmlFor="payerName">支払者</Label>
                 
-                {isAddingNewPayer ? (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        id="payerName"
-                        value={newExpense.payerName}
-                        onChange={(e) => setNewExpense({...newExpense, payerName: e.target.value})}
-                        placeholder="新しい支払者の名前"
-                        className="flex-1"
-                      />
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setIsAddingNewPayer(false)}
-                      >
-                        既存から選択
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Select
-                      value={newExpense.payerName}
-                      onValueChange={(value) => setNewExpense({...newExpense, payerName: value})}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="支払者を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {uniqueParticipants.map((name) => (
-                          <SelectItem key={name} value={name}>
-                            {name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setIsAddingNewPayer(true);
-                        setNewExpense({...newExpense, payerName: ''});
-                      }}
-                    >
-                      <UserPlus className="h-4 w-4 mr-1" />
-                      新規
-                    </Button>
-                  </div>
-                )}
+                <Select
+                  value={newExpense.payerName}
+                  onValueChange={(value) => setNewExpense({...newExpense, payerName: value})}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="支払者を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueParticipants.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
