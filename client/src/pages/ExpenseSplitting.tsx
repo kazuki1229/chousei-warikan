@@ -285,31 +285,34 @@ export default function ExpenseSplitting() {
   const perPersonAmount = participantCount > 0 ? totalExpenses / participantCount : 0;
   
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">
-        {event.title} - 費用精算
+    <div className="w-full">
+      <h1 className="text-xl font-bold text-slate-800 mb-4">
+        {event.title} <span className="text-slate-500 font-normal">- 費用精算</span>
       </h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">記録された支払額</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(totalExpenses)}</p>
+      <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0 mb-6">
+        {/* 支払総額カード */}
+        <div className="mobile-card">
+          <div className="card-header-mobile">
+            <h3 className="font-medium text-base">記録された支払額</h3>
+          </div>
+          <div className="card-content-mobile">
+            <p className="text-xl font-bold">{formatCurrency(totalExpenses)}</p>
             <p className="text-xs text-slate-500 mt-1">すべての支払いの合計金額</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
-        <Card>
-          <CardHeader className="pb-2">
+        {/* 参加者カード */}
+        <div className="mobile-card">
+          <div className="card-header-mobile">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">参加人数</CardTitle>
+              <h3 className="font-medium text-base">参加人数</h3>
               {isAddingNewPayer ? (
                 <Button 
                   type="button" 
                   size="sm" 
                   variant="outline"
+                  className="h-7 text-xs px-2"
                   onClick={() => setIsAddingNewPayer(false)}
                 >
                   キャンセル
@@ -319,28 +322,29 @@ export default function ExpenseSplitting() {
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-7 text-xs px-2"
                   onClick={() => setIsAddingNewPayer(true)}
                 >
-                  <UserPlus className="h-4 w-4 mr-1" />
-                  新規追加
+                  <UserPlus className="h-3.5 w-3.5 mr-1" />
+                  追加
                 </Button>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="card-content-mobile">
             {isAddingNewPayer ? (
               <div className="space-y-3">
                 <Input
                   value={newParticipantName}
                   onChange={(e) => setNewParticipantName(e.target.value)}
                   placeholder="新しい参加者の名前"
-                  className="w-full"
+                  className="w-full text-sm"
                   autoFocus
                 />
                 <Button 
                   type="button" 
                   size="sm" 
-                  className="w-full"
+                  className="w-full h-8 text-xs"
                   onClick={() => {
                     if (newParticipantName.trim()) {
                       // 既存の参加者と重複していないか確認
@@ -419,7 +423,7 @@ export default function ExpenseSplitting() {
               </div>
             ) : (
               <>
-                <p className="text-2xl font-bold">{participantCount}人</p>
+                <p className="text-xl font-bold">{participantCount}人</p>
                 <p className="text-xs text-slate-500 mt-1">このイベントの全参加メンバー</p>
                 {participantCount > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -432,28 +436,30 @@ export default function ExpenseSplitting() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">支払い記録</CardTitle>
-            <CardDescription>
+      <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
+        {/* 支払い記録セクション */}
+        <div className="mobile-card form-mobile">
+          <div className="card-header-mobile">
+            <h3 className="font-medium text-base">支払い記録</h3>
+            <p className="text-xs text-slate-500 mt-1">
               支払いを記録して精算計算を行います
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleAddExpense} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="payerName">支払者</Label>
+            </p>
+          </div>
+          <div className="card-content-mobile">
+            <form onSubmit={handleAddExpense} className="space-y-3">
+              {/* 支払者フィールド */}
+              <div className="space-y-1.5">
+                <Label htmlFor="payerName" className="text-sm">支払者</Label>
                 
                 <Select
                   value={newExpense.payerName}
                   onValueChange={(value) => setNewExpense({...newExpense, payerName: value})}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full h-9 text-sm">
                     <SelectValue placeholder="支払者を選択" />
                   </SelectTrigger>
                   <SelectContent>
@@ -466,24 +472,27 @@ export default function ExpenseSplitting() {
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="description">項目</Label>
+              {/* 項目フィールド */}
+              <div className="space-y-1.5">
+                <Label htmlFor="description" className="text-sm">項目</Label>
                 <Input
                   id="description"
                   value={newExpense.description}
                   onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
                   placeholder="例: 会議室予約"
+                  className="h-9 text-sm"
                   required
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="amount">金額</Label>
+              {/* 金額フィールド */}
+              <div className="space-y-1.5">
+                <Label htmlFor="amount" className="text-sm">金額</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-slate-500">¥</span>
                   <Input
                     id="amount"
-                    className="pl-8"
+                    className="pl-8 h-9 text-sm"
                     value={newExpense.amount}
                     onChange={(e) => {
                       // 数字以外を削除し、整数値のみ許可
@@ -499,22 +508,23 @@ export default function ExpenseSplitting() {
                 </div>
               </div>
               
-              <div className="space-y-2">
+              {/* 割り勘対象者セレクション */}
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>割り勘対象者</Label>
+                  <Label className="text-sm">割り勘対象者</Label>
                   <Button 
                     type="button" 
                     variant="ghost" 
                     size="sm"
                     onClick={() => setIsSelectingParticipants(!isSelectingParticipants)}
-                    className="h-7 text-xs"
+                    className="h-6 text-xs px-1.5"
                   >
-                    {isSelectingParticipants ? '完了' : '対象者を選択'}
+                    {isSelectingParticipants ? '完了' : '選択'}
                   </Button>
                 </div>
                 
                 {isSelectingParticipants ? (
-                  <div className="border rounded-md p-3 space-y-3">
+                  <div className="border rounded-md p-2 space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox 
                         id="select-all" 
@@ -532,15 +542,15 @@ export default function ExpenseSplitting() {
                       />
                       <label 
                         htmlFor="select-all" 
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        className="text-xs font-medium leading-none"
                       >
                         全員を選択
                       </label>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {uniqueParticipants.map((name) => (
-                        <div key={name} className="flex items-center space-x-2">
+                        <div key={name} className="flex items-center space-x-1.5">
                           <Checkbox 
                             id={`participant-${name}`} 
                             checked={newExpense.participants.includes(name)}
@@ -563,7 +573,7 @@ export default function ExpenseSplitting() {
                           />
                           <label 
                             htmlFor={`participant-${name}`} 
-                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            className="text-xs leading-none"
                           >
                             {name}
                           </label>
@@ -572,27 +582,28 @@ export default function ExpenseSplitting() {
                     </div>
                   </div>
                 ) : (
-                  <div className="border rounded-md p-3">
+                  <div className="border rounded-md p-2">
                     {newExpense.participants.length > 0 ? (
                       <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2 text-primary/70" />
-                        <p className="text-sm">
+                        <Users className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
+                        <p className="text-xs">
                           {newExpense.participants.length}人が選択されています
                         </p>
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">全員で割り勘します</p>
+                      <p className="text-xs text-slate-500">全員で割り勘します</p>
                     )}
                   </div>
                 )}
               </div>
               
+              {/* 追加ボタン */}
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full h-9 text-sm mt-2" 
                 disabled={addExpenseMutation.isPending}
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 {addExpenseMutation.isPending ? '追加中...' : '支払いを追加'}
               </Button>
             </form>
@@ -645,78 +656,82 @@ export default function ExpenseSplitting() {
                 <p>まだ支払いが記録されていません</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">精算レコメンド</CardTitle>
-            <CardDescription>
+        {/* 精算レコメンドカード */}
+        <div className="mobile-card">
+          <div className="card-header-mobile">
+            <h3 className="font-medium text-base">精算レコメンド</h3>
+            <p className="text-xs text-slate-500 mt-1">
               最も効率的な精算方法を表示します
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="card-content-mobile">
             {settlements && settlements.length > 0 ? (
-              <div className="space-y-4">
-                <div className="p-3 rounded-md border-l-4 border-blue-500 bg-blue-50">
-                  <p className="text-sm text-blue-700 font-medium">
-                    この精算方法で、すべての支払いが最小限の取引で相殺されます。
+              <div className="space-y-3">
+                <div className="p-2 rounded-md border-l-4 border-blue-500 bg-blue-50">
+                  <p className="text-xs text-blue-700">
+                    この精算方法で、最小限の取引で相殺されます。
                   </p>
                 </div>
                 
                 {settlements.map((settlement, index) => (
                   <div 
                     key={index} 
-                    className="p-4 rounded-md border border-green-200 bg-green-50 shadow-sm"
+                    className="p-3 rounded-md border border-green-200 bg-green-50"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between text-sm">
                       <div className="font-medium">{settlement.from}</div>
                       <div className="flex items-center">
-                        <ArrowRight className="h-5 w-5 text-green-600 mx-2" />
+                        <ArrowRight className="h-4 w-4 text-green-600 mx-1" />
                       </div>
                       <div className="font-medium">{settlement.to}</div>
                     </div>
-                    <div className="mt-2 text-center">
-                      <span className="text-lg font-bold text-green-700">
+                    <div className="mt-1.5 text-center">
+                      <span className="text-base font-bold text-green-700">
                         {formatCurrency(settlement.amount)}
                       </span>
-                      <span className="ml-1 text-green-700">支払う</span>
+                      <span className="ml-1 text-xs text-green-700">支払う</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : expenses && expenses.length > 1 ? (
-              <div className="text-center p-6">
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 mb-4">
-                  <p className="text-amber-700">
+              <div className="text-center p-4">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs text-amber-700">
                     参加者間の貸し借りがすべて相殺されているため、精算は不要です。
                   </p>
                 </div>
               </div>
             ) : expenses && expenses.length === 1 ? (
-              <div className="text-center p-6">
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-4 mb-4">
-                  <p className="text-amber-700">
+              <div className="text-center p-4">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs text-amber-700">
                     複数の支払いが記録されると、精算方法が表示されます。
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="text-center p-8 text-slate-500">
-                <Calculator className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-                <p>支払いを記録すると、精算方法が表示されます</p>
+              <div className="text-center p-6 text-slate-500">
+                <Calculator className="h-8 w-8 mx-auto mb-3 text-slate-400" />
+                <p className="text-sm">支払いを記録すると、精算方法が表示されます</p>
               </div>
             )}
-          </CardContent>
-          <CardFooter className="justify-end">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/event/${id}`)}
-            >
-              イベントに戻る
-            </Button>
-          </CardFooter>
-        </Card>
+            
+            <div className="flex justify-end mt-4">
+              <Button 
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => navigate(`/event/${id}`)}
+              >
+                イベントに戻る
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
