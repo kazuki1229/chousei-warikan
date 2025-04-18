@@ -59,6 +59,8 @@ export default function ExpenseSplitting() {
   const [selectAllParticipants, setSelectAllParticipants] = useState(true);
   // 参加者一覧（重複排除済み）
   const [uniqueParticipants, setUniqueParticipants] = useState<string[]>([]);
+  // 新規参加者名（入力用）
+  const [newParticipantName, setNewParticipantName] = useState('');
 
   // イベント情報を取得
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
@@ -296,30 +298,31 @@ export default function ExpenseSplitting() {
             {isAddingNewPayer ? (
               <div className="space-y-3">
                 <Input
-                  value={newExpense.payerName}
-                  onChange={(e) => setNewExpense({...newExpense, payerName: e.target.value})}
+                  value={newParticipantName}
+                  onChange={(e) => setNewParticipantName(e.target.value)}
                   placeholder="新しい参加者の名前"
                   className="w-full"
+                  autoFocus
                 />
                 <Button 
                   type="button" 
                   size="sm" 
                   className="w-full"
                   onClick={() => {
-                    if (newExpense.payerName.trim()) {
+                    if (newParticipantName.trim()) {
                       // 既存の参加者と重複していないか確認
-                      if (!uniqueParticipants.includes(newExpense.payerName.trim())) {
-                        const newParticipantName = newExpense.payerName.trim();
+                      if (!uniqueParticipants.includes(newParticipantName.trim())) {
+                        const trimmedName = newParticipantName.trim();
                         // 新しい参加者を追加
-                        setUniqueParticipants([...uniqueParticipants, newParticipantName]);
+                        setUniqueParticipants([...uniqueParticipants, trimmedName]);
                         // 入力フィールドをクリア
-                        setNewExpense({...newExpense, payerName: ''});
+                        setNewParticipantName('');
                         // 新規追加モードを終了
                         setIsAddingNewPayer(false);
                         // 通知
                         toast({
                           title: "参加者を追加しました",
-                          description: `${newParticipantName}さんが参加者リストに追加されました`,
+                          description: `${trimmedName}さんが参加者リストに追加されました`,
                         });
                       } else {
                         toast({
