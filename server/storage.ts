@@ -214,10 +214,11 @@ export class MemStorage implements IStorage {
   }
   
   // Expense methods
-  async createExpense(expense: InsertExpense & { id: string }): Promise<Expense> {
+  async createExpense(expense: InsertExpense & { id: string, isSharedWithAll?: boolean }): Promise<Expense & { isSharedWithAll?: boolean }> {
     const newExpense = {
       ...expense,
       participants: expense.participants || [],
+      isSharedWithAll: expense.isSharedWithAll || false, // 全員割り勘フラグ
       createdAt: new Date(),
     };
     this.expenses.set(expense.id, newExpense);
@@ -237,7 +238,7 @@ export class MemStorage implements IStorage {
     this.expenses.delete(id);
   }
   
-  async updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense> {
+  async updateExpense(id: string, data: Partial<InsertExpense> & { isSharedWithAll?: boolean }): Promise<Expense & { isSharedWithAll?: boolean }> {
     const expense = this.expenses.get(id);
     if (!expense) throw new Error("Expense not found");
     

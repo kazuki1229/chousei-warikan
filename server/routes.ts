@@ -250,12 +250,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "イベントの日程が確定していないため、精算機能は利用できません" });
       }
       
-      // 「全員で割り勘」の場合、明示的に全参加者を設定する
+      // 「全員で割り勘」の場合、専用フラグを立てる
       let participants = validatedData.participants;
+      let isSharedWithAll = false;
+      
       if (!participants || participants.length === 0) {
+        // 全員割り勘フラグをONにする
+        isSharedWithAll = true;
+        
         // 全参加者を取得して設定する
         const allParticipants = await storage.getEventParticipants(req.params.id);
-        console.log(`「全員で割り勘」設定のため、${allParticipants.length}人全員を明示的に参加者として設定します`);
+        console.log(`「全員で割り勘」フラグを設定しました。${allParticipants.length}人全員を参加者として記録します`);
         participants = allParticipants;
       }
       
@@ -266,6 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: validatedData.description,
         amount: String(validatedData.amount),
         participants: participants,
+        isSharedWithAll: isSharedWithAll, // 全員割り勘フラグを設定
       });
       
       res.status(201).json(expense);
@@ -310,17 +316,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 4. イベントの経費を取得
       const expenses = await storage.getEventExpenses(req.params.id);
       
-      // 5. 「全員割り勘」の経費を特定
+      // 5. 「全員割り勘」フラグを持つ経費を特定
       const sharedExpenses = expenses.filter(expense => 
-        !expense.participants || expense.participants.length === 0
+        expense.isSharedWithAll === true
       );
       
-      console.log(`参加者「${validatedData.name}」を追加します。全員割り勘の経費数: ${sharedExpenses.length}`);
+      console.log(`参加者「${validatedData.name}」を追加します。全員割り勘フラグの経費数: ${sharedExpenses.length}`);
       
       // 6. イベントに参加者として追加
       // (仮想的には既に参加者リストに追加されている扱いでよい)
       
-      // 7. 「全員割り勘」になっている支出がある場合、データベースの支出データを更新
+      // 7. 「全員割り勘」フラグを持つ支出がある場合、データベースの支出データを更新
       if (sharedExpenses.length > 0) {
         console.log(`「全員割り勘」の経費 ${sharedExpenses.length}件を更新します`);
         
@@ -329,19 +335,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`支出ID: ${expense.id}, 項目: ${expense.description}, ` +
                      `金額: ${expense.amount}円 を更新中...`);
           
-          // 2. 支出データに新しい参加者のデータを追加
-          if (!expense.participants) {
-            expense.participants = [];
-          }
-          
-          // 3. 明示的に全員を参加者として設定
+          // 2. 明示的に全員を参加者として設定
           // 注: 将来的に参加者が除外された場合にも対応できるよう、
           // その時点での参加者リストを明示的に設定しておく
           await storage.updateExpense(expense.id, {
-            participants: newParticipantsList
+            participants: newParticipantsList,
+            isSharedWithAll: true // 全員割り勘フラグを維持
           });
           
           console.log(`支出ID: ${expense.id} の参加者を ${newParticipantsList.length}人に更新しました`);
+        }
+      }
+      
+      // 8. 後方互換性のため、古い支出データもチェック（参加者が空でフラグがない場合）
+      const oldSharedExpenses = expenses.filter(expense => 
+        expense.isSharedWithAll !== true && // 新しいフラグがない
+        (!expense.participants || expense.participants.length === 0) // 参加者が指定されていない
+      );
+      
+      if (oldSharedExpenses.length > 0) {
+        console.log(`後方互換性: 古い形式の「全員割り勘」経費が ${oldSharedExpenses.length}件 見つかりました`);
+        
+        // 古い形式の「全員割り勘」も更新
+        for (const expense of oldSharedExpenses) {
+          console.log(`[後方互換] 支出ID: ${expense.id} を更新中...`);
+          
+          // 新しいフォーマットに更新
+          await storage.updateExpense(expense.id, {
+            participants: newParticipantsList,
+            isSharedWithAll: true // 全員割り勘フラグを設定
+          });
+          
+          console.log(`[後方互換] 支出ID: ${expense.id} を新形式に更新しました`);
         }
       }
       
@@ -455,16 +480,20 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     // 重要: 分担者を確定
     let splitParticipants: string[] = [];
     
-    if (expense.participants && expense.participants.length > 0) {
-      // 明示的に指定された参加者のリスト
+    // 全員で割り勘フラグがある場合は、現在の全参加者で分ける
+    if (expense.isSharedWithAll === true) {
+      splitParticipants = [...allCurrentParticipants];
+      console.log(`全員で割り勘フラグあり: ${splitParticipants.length}人`);
+    }
+    // 明示的に参加者が指定されている場合
+    else if (expense.participants && expense.participants.length > 0) {
       splitParticipants = [...expense.participants];
       console.log(`明示的に指定された参加者: ${splitParticipants.join(', ')}`);
-    } else {
-      // 「全員で割り勘」のケース - 現在の全参加者で分ける
-      // この処理は互換性のため残しているが、基本的に新しいコードでは
-      // 全員で割り勘でも明示的に参加者リストを設定するようになっている
+    } 
+    // 後方互換性: 「全員で割り勘」のケース（古い形式）
+    else {
       splitParticipants = [...allCurrentParticipants];
-      console.log(`全員で割り勘 (暗黙): ${splitParticipants.length}人`);
+      console.log(`全員で割り勘 (暗黙・後方互換): ${splitParticipants.length}人`);
     }
     
     console.log(`分担者(${splitParticipants.length}人): ${splitParticipants.join(', ')}`);
