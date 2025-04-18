@@ -317,46 +317,49 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   // すべての参加者を集める
   const allParticipants = new Set<string>();
   
-  // 支払者は常に参加者に含める
+  // まずは全ての支払者と全ての参加者を集める
   expenses.forEach(expense => {
+    // 支払者を追加
     allParticipants.add(expense.payerName);
+    
+    // 参加者が指定されている場合は参加者リストに追加
+    if (expense.participants && expense.participants.length > 0) {
+      expense.participants.forEach((p: string) => allParticipants.add(p));
+    }
   });
   
   // 各支出の計算を行う
   const personalBalances: { [key: string]: number } = {};
   
+  // 全ての参加者の残高を0で初期化
+  Array.from(allParticipants).forEach(person => {
+    personalBalances[person] = 0;
+  });
+  
   expenses.forEach(expense => {
     const amount = Number(expense.amount);
     const payerName = expense.payerName;
     
-    // 支払者には支払い額を加算
-    personalBalances[payerName] = (personalBalances[payerName] || 0) + amount;
+    // 支払者には支払い額を加算（立替分）
+    personalBalances[payerName] += amount;
     
     // 指定された参加者間で分割する
     let splitParticipants: string[] = [];
     
-    // 参加者が指定されている場合はその参加者で分割、そうでなければ全員で分割
+    // 参加者が指定されている場合はその参加者で分割
     if (expense.participants && expense.participants.length > 0) {
       splitParticipants = expense.participants;
-      // 参加者リストに入っていない人も追加
-      splitParticipants.forEach(p => allParticipants.add(p));
     } else {
-      // 参加者が指定されていない場合は、その時点でのすべての支払い者で分割
-      const currentPayers = Array.from(allParticipants);
-      splitParticipants = currentPayers;
+      // 参加者が指定されていない場合は、全員で分割
+      splitParticipants = Array.from(allParticipants);
     }
     
     // 参加者ごとの割り勘額を計算
     const perPersonAmount = amount / splitParticipants.length;
     
-    // 各参加者の残高を更新
+    // 各参加者の残高を更新（負担分を引く）
     splitParticipants.forEach(person => {
-      // 支払った人自身も分担するが、既に支払い額を加算済みなので差し引く
-      if (person === payerName) {
-        personalBalances[person] = (personalBalances[person] || 0) - perPersonAmount;
-      } else {
-        personalBalances[person] = (personalBalances[person] || 0) - perPersonAmount;
-      }
+      personalBalances[person] -= perPersonAmount;
     });
   });
   

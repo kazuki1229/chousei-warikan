@@ -93,7 +93,7 @@ export default function EventAttendance() {
           // Add new event to recent list
           recentEvents.push({
             id,
-            title: event.title
+            title: event?.title || "イベント"
           });
         }
         
