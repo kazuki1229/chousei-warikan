@@ -220,89 +220,148 @@ export default function EventDetail() {
         <TabsContent value="schedule">
           {event.selectedDate ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">確定した日程</CardTitle>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg">確定した日程</CardTitle>
+                    <CardDescription>
+                      この日程でイベントが開催されます
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-green-50 rounded-lg border border-green-100 text-green-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Check className="h-5 w-5" />
-                    <span className="font-medium">日程確定</span>
+                <div className="flex items-center gap-4 p-5 bg-green-50 rounded-lg border border-green-100 text-green-800">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <Check className="h-6 w-6 text-green-600" />
                   </div>
-                  
-                  <p className="text-lg font-medium">
-                    {formatDate(new Date(event.selectedDate))}
-                  </p>
-                  
-                  <p className="mt-1">
-                    {event.startTime} - {event.endTime}
-                  </p>
+                  <div>
+                    <p className="text-xl font-medium">
+                      {formatDate(new Date(event.selectedDate))}
+                    </p>
+                    <p className="text-green-700 mt-1">
+                      {event.startTime} - {event.endTime}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex justify-center mt-6">
+                  <Button 
+                    onClick={() => navigate(`/event/${id}/expenses`)}
+                    variant={event.selectedDate ? "default" : "outline"}
+                    className="w-full md:w-auto"
+                    disabled={!event.selectedDate}
+                  >
+                    <Calculator className="mr-2 h-4 w-4" />
+                    費用精算に進む
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">候補日程</CardTitle>
-                <CardDescription>最適な日程を選択してください</CardDescription>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg">候補日程</CardTitle>
+                    <CardDescription>
+                      参加者の出欠に基づいて最適な日程を確定できます
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {event.dateOptions.map((option) => {
-                  const availability = calculateAvailability(option.id);
-                  
-                  return (
-                    <div 
-                      key={option.id} 
-                      className="p-4 border rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                          <p className="font-medium">
-                            {formatDate(new Date(option.date))}
-                          </p>
-                          <p className="text-slate-500 text-sm">
-                            {option.startTime} - {option.endTime}
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <div className="flex flex-col items-center">
-                              <span className="text-sm font-medium text-green-700">{availability.available}</span>
-                              <span className="text-xs text-slate-500">◯</span>
+              <CardContent>
+                <div className="mb-6">
+                  <Button 
+                    onClick={() => navigate(`/event/${id}/attendance`)}
+                    className="w-full md:w-auto"
+                    variant="outline" 
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    自分の出欠を入力
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {event.dateOptions.map((option) => {
+                    const availability = calculateAvailability(option.id);
+                    const totalResponses = availability.available + availability.maybe + availability.unavailable;
+                    const availablePercent = totalResponses > 0 
+                      ? Math.round((availability.available / totalResponses) * 100) 
+                      : 0;
+                    
+                    return (
+                      <div 
+                        key={option.id} 
+                        className="border rounded-lg hover:border-primary/30 transition-colors"
+                      >
+                        <div className="p-4">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <div className="flex items-center">
+                                <CalendarClock className="h-4 w-4 text-primary mr-2" />
+                                <p className="font-medium">
+                                  {formatDate(new Date(option.date))}
+                                </p>
+                              </div>
+                              <p className="text-slate-500 text-sm mt-1">
+                                {option.startTime} - {option.endTime}
+                              </p>
                             </div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-sm font-medium text-amber-700">{availability.maybe}</span>
-                              <span className="text-xs text-slate-500">△</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-sm font-medium text-red-700">{availability.unavailable}</span>
-                              <span className="text-xs text-slate-500">×</span>
-                            </div>
+                            
+                            {!event.selectedDate && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => finalizeEventMutation.mutate(option.id)}
+                                disabled={finalizeEventMutation.isPending}
+                              >
+                                確定する
+                              </Button>
+                            )}
                           </div>
                           
-                          {!event.selectedDate && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => finalizeEventMutation.mutate(option.id)}
-                              disabled={finalizeEventMutation.isPending}
-                            >
-                              確定する
-                            </Button>
-                          )}
+                          <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                                  <span className="text-sm font-medium">{availability.available}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
+                                  <span className="text-sm font-medium">{availability.maybe}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 rounded-full bg-red-400"></span>
+                                  <span className="text-sm font-medium">{availability.unavailable}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="text-sm text-slate-500">
+                              回答: {totalResponses}/{attendances?.length || 0}人
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </CardContent>
-              <CardFooter className="flex justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/event/${id}/attendance`)}
+              <CardFooter className="flex justify-between border-t pt-4">
+                <div className="text-slate-500 text-sm flex items-center">
+                  <Users className="h-4 w-4 mr-2" />
+                  回答者数: {attendances?.length || 0}人
+                </div>
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyUrlToClipboard}
+                  className="text-slate-500"
                 >
-                  出欠を入力する
+                  <Share2 className="h-4 w-4 mr-2" />
+                  共有
                 </Button>
               </CardFooter>
             </Card>
@@ -311,20 +370,35 @@ export default function EventDetail() {
         
         <TabsContent value="participants">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">参加者一覧</CardTitle>
-              <CardDescription>
-                現在の参加者: {attendances?.length || 0}人
-              </CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-lg">参加者一覧</CardTitle>
+                  <CardDescription>
+                    全ての参加者: {attendances?.length || 0}人
+                  </CardDescription>
+                </div>
+                
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/event/${id}/attendance`)}
+                >
+                  出欠を入力する
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {attendances && attendances.length > 0 ? (
-                <div className="space-y-3">
+                <div className="divide-y">
                   {attendances.map((attendance) => (
                     <div 
                       key={attendance.id} 
-                      className="flex items-center justify-between p-3 border rounded-lg"
+                      className="flex items-center py-3"
                     >
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3">
+                        {attendance.name.charAt(0)}
+                      </div>
                       <div>
                         <p className="font-medium">{attendance.name}</p>
                       </div>
@@ -332,11 +406,14 @@ export default function EventDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center p-6 text-slate-500">
-                  <p>まだ参加者がいません</p>
+                <div className="text-center py-8 px-4">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 mb-4">
+                    <Users className="h-6 w-6 text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">まだ参加者がいません</h3>
+                  <p className="text-slate-500 mb-4">友達や同僚に共有して、日程調整を始めましょう</p>
                   <Button 
                     variant="outline" 
-                    className="mt-4"
                     onClick={copyUrlToClipboard}
                   >
                     <Share2 className="mr-2 h-4 w-4" />
@@ -350,22 +427,62 @@ export default function EventDetail() {
         
         <TabsContent value="expenses">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {event.selectedDate ? "費用精算" : "開催日が確定すると精算機能が使えます"}
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-lg">費用精算</CardTitle>
+                  <CardDescription>
+                    {event.selectedDate 
+                      ? "イベントの支払いを簡単に管理できます" 
+                      : "開催日が確定すると精算機能が使えます"}
+                  </CardDescription>
+                </div>
+                
+                {event.selectedDate && (
+                  <Button 
+                    onClick={() => navigate(`/event/${id}/expenses`)}
+                    size="sm"
+                  >
+                    <Calculator className="mr-2 h-4 w-4" />
+                    精算を管理
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {event.selectedDate ? (
-                <div className="space-y-4">
-                  <Button onClick={() => navigate(`/event/${id}/expenses`)}>
-                    <Calculator className="mr-2 h-4 w-4" />
-                    精算ページへ
+                <div className="border rounded-lg p-4">
+                  <div className="mb-4">
+                    <h3 className="font-medium mb-2">精算機能でできること</h3>
+                    <ul className="space-y-2 text-slate-600">
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+                        <span>イベントの支払いを全員で簡単に分担</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+                        <span>各参加者の負担額を自動計算</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-500 mr-2 mt-1 flex-shrink-0" />
+                        <span>誰が誰にいくら支払うべきかを算出</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <Button 
+                    onClick={() => navigate(`/event/${id}/expenses`)}
+                    className="w-full"
+                  >
+                    精算ページに移動
                   </Button>
                 </div>
               ) : (
-                <div className="text-center p-6 text-slate-500">
-                  <p>日程が確定するまで精算機能は使用できません</p>
+                <div className="text-center py-8 px-4">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 mb-4">
+                    <Calculator className="h-6 w-6 text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">まだ利用できません</h3>
+                  <p className="text-slate-500">イベントの日程が確定すると、参加者と費用を分担できます</p>
                 </div>
               )}
             </CardContent>

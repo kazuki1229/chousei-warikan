@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { 
   Card, 
   CardContent, 
@@ -18,6 +18,7 @@ export default function Home() {
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
   });
+  const [, navigate] = useLocation();
   
   // ローカルストレージから参加済みイベントの履歴を取得
   const [recentEvents, setRecentEvents] = useState<{id: string, title: string}[]>([]);
@@ -38,12 +39,13 @@ export default function Home() {
     <div className="max-w-6xl mx-auto">
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-bold text-slate-800 mb-4 md:mb-0">イベント調整さん</h1>
-        <Link href="/create">
-          <Button className="flex items-center gap-2">
-            <PlusCircle className="h-4 w-4" />
-            新しい予定を作成
-          </Button>
-        </Link>
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => navigate('/create')}
+        >
+          <PlusCircle className="h-4 w-4" />
+          新しい予定を作成
+        </Button>
       </div>
 
       {/* 最近参加したイベント */}
@@ -55,7 +57,7 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentEvents.map((event) => (
-              <Link key={event.id} href={`/event/${event.id}`}>
+              <div key={event.id} onClick={() => navigate(`/event/${event.id}`)}>
                 <Card className="cursor-pointer hover:shadow-md transition-shadow border-primary/20">
                   <CardContent className="py-4">
                     <div className="flex items-center">
@@ -67,7 +69,7 @@ export default function Home() {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -83,12 +85,14 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <div className="h-24 flex items-center justify-center">
-              <Link href="/create">
-                <Button variant="outline" className="border-primary/30 hover:bg-primary/10">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  予定を作成する
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="border-primary/30 hover:bg-primary/10"
+                onClick={() => navigate('/create')}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                予定を作成する
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -101,8 +105,12 @@ export default function Home() {
           </Card>
         ) : events && events.length > 0 ? (
           events.map((event) => (
-            <Link key={event.id} href={`/event/${event.id}`}>
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <div 
+              key={event.id} 
+              onClick={() => navigate(`/event/${event.id}`)}
+              className="cursor-pointer"
+            >
+              <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">{event.title}</CardTitle>
                   <CardDescription>
@@ -123,7 +131,7 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
           ))
         ) : (
           <Card>
