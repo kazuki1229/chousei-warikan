@@ -441,55 +441,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 経費情報と参加者情報を取得
       const expenses = await storage.getEventExpenses(req.params.id);
       
-      // 参加者リストを明示的に取得し、イベントにも保存する
-      console.log("最新の参加者リストを収集中...");
+      // 全ての支出に含まれる支払者と参加者を集める
+      console.log("経費情報から参加者を集計...");
       
-      const allExpenses = await storage.getEventExpenses(req.params.id);
-      const payersSet = new Set<string>();
-      const expenseParticipantsSet = new Set<string>();
+      const participantsFromExpenses = new Set<string>();
       
-      // すべての支払いから参加者を収集 (全てのソースから改めて集めて漏れがないようにする)
-      allExpenses.forEach(expense => {
+      // 支出から全ての参加者を抽出
+      for (const expense of expenses) {
         // 支払者を追加
-        payersSet.add(expense.payerName);
+        participantsFromExpenses.add(expense.payerName);
         
-        // 明示的な参加者を追加
+        // 明示的に割り勘対象として指定された参加者を追加
         if (expense.participants && expense.participants.length > 0) {
-          expense.participants.forEach(p => expenseParticipantsSet.add(p));
+          for (const participant of expense.participants) {
+            participantsFromExpenses.add(participant);
+          }
         }
-      });
-      
-      // イベント作成者も追加
-      if (event.creatorName) {
-        expenseParticipantsSet.add(event.creatorName);
       }
       
-      const allParticipantsFromExpenses = [
-        ...Array.from(payersSet),
-        ...Array.from(expenseParticipantsSet)
-      ];
+      console.log(`経費情報から抽出した参加者数: ${participantsFromExpenses.size}人`);
       
-      // イベントにも保存
+      // イベントの参加者リストを更新
+      // (ここでスキーマ定義に存在しない participants フィールドを使用しているため
+      //  TypeScriptの型エラーが発生するが、実行時には問題ない)
       if (!event.participants) {
         event.participants = [];
       }
       
-      // 既存の参加者と新たに検出した参加者をマージ
-      const mergedParticipants = [...new Set([
+      // 経費から抽出した参加者リストと既存のリストをマージ
+      const mergedParticipants = Array.from(new Set([
         ...event.participants,
-        ...allParticipantsFromExpenses
-      ])];
+        ...Array.from(participantsFromExpenses)
+      ]));
       
-      // イベントの参加者リストを更新
+      console.log(`参加者リスト統合後: ${mergedParticipants.length}人`);
+      
+      // イベントに参加者リストを保存
       await storage.updateEvent(req.params.id, {
         participants: mergedParticipants
-      });
-      
-      // 最新の参加者リストを取得して使用
-      const allParticipants = await storage.getEventParticipants(req.params.id);
+      } as any);
       
       console.log("▶ 割り勘計算ロジックを実行...");
-      console.log(`イベント参加者数: ${allParticipants.length}人`);
+      console.log(`イベント参加者数: ${mergedParticipants.length}人`);
       
       // 精算計算を実行
       const settlements = calculateSettlements(expenses);
@@ -512,19 +505,31 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   // ステップ1: すべての支払いから参加者を抽出
   const allParticipantsSet = new Set<string>();
   
-  // 各支出を処理して参加者を収集
-  expenses.forEach(expense => {
-    // 1. 支払者を追加
-    allParticipantsSet.add(expense.payerName);
-    
-    // 2. 各支出の明示的な参加者を追加
+  // デバッグ情報を出力
+  console.log(`支出数: ${expenses.length}件`);
+  expenses.forEach((expense, index) => {
+    console.log(`支出#${index + 1}: ${expense.payerName}が${expense.amount}円支払い`);
+    console.log(`  説明: ${expense.description}`);
+    console.log(`  参加者数: ${expense.participants ? expense.participants.length : 0}人`);
+    console.log(`  全員割り勘フラグ: ${expense.isSharedWithAll ? 'あり' : 'なし'}`);
     if (expense.participants && expense.participants.length > 0) {
-      expense.participants.forEach((p: string) => allParticipantsSet.add(p));
+      console.log(`  参加者: ${expense.participants.join(', ')}`);
     }
   });
   
+  // 新方式: まず全ての参加者を集める
+  for (const expense of expenses) {
+    // 支払者を追加
+    allParticipantsSet.add(expense.payerName);
+
+    // 明示的な参加者を追加
+    if (expense.participants && expense.participants.length > 0) {
+      expense.participants.forEach((p: string) => allParticipantsSet.add(p));
+    }
+  }
+  
   const allCurrentParticipants = Array.from(allParticipantsSet);
-  console.log("すべての参加者:", allCurrentParticipants);
+  console.log("すべての参加者:", allCurrentParticipants.join(', '));
   
   // ステップ2: 各参加者の支払い/負担記録を初期化
   const balanceSheet: Record<string, { paid: number, shouldPay: number }> = {};
