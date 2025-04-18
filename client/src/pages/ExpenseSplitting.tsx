@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { 
@@ -12,16 +12,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Calculator, 
   Plus, 
   Trash2, 
   ArrowLeftRight, 
   AlertCircle,
-  Loader2
+  Loader2,
+  Users,
+  UserPlus,
+  Wallet
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Event, Expense, Settlement } from '@shared/schema';
+import { Event, Expense, Settlement, Attendance } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { formatCurrency } from '@/lib/utils';
 
@@ -31,25 +42,71 @@ export default function ExpenseSplitting() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // 新しい支出データの状態
   const [newExpense, setNewExpense] = useState({
     payerName: '',
     description: '',
-    amount: ''
+    amount: '',
+    participants: [] as string[] // 割り勘対象者の配列
   });
   
+  // 新規参加者の追加モード
+  const [isAddingNewPayer, setIsAddingNewPayer] = useState(false);
+  // 参加者選択モード
+  const [isSelectingParticipants, setIsSelectingParticipants] = useState(false);
+  // 全員選択状態
+  const [selectAllParticipants, setSelectAllParticipants] = useState(true);
+  // 参加者一覧（重複排除済み）
+  const [uniqueParticipants, setUniqueParticipants] = useState<string[]>([]);
+
+  // イベント情報を取得
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: [`/api/events/${id}`],
   });
   
+  // イベント参加者リストを取得
+  const { data: attendances, isLoading: attendancesLoading } = useQuery<Attendance[]>({
+    queryKey: [`/api/events/${id}/attendances`],
+    enabled: !!event,
+  });
+  
+  // 経費情報を取得
   const { data: expenses, isLoading: expensesLoading } = useQuery<Expense[]>({
     queryKey: [`/api/events/${id}/expenses`],
     enabled: !!event,
   });
   
+  // 精算情報を取得
   const { data: settlements, isLoading: settlementsLoading } = useQuery<Settlement[]>({
     queryKey: [`/api/events/${id}/settlements`],
     enabled: !!event && !!expenses && expenses.length > 0,
   });
+  
+  // イベント作成者を含む全参加者リストを作成
+  useEffect(() => {
+    if (event && attendances) {
+      // 1. イベント作成者を追加
+      const participants: string[] = [event.creatorName];
+      
+      // 2. 参加者を追加
+      attendances.forEach(attendance => {
+        if (!participants.includes(attendance.name)) {
+          participants.push(attendance.name);
+        }
+      });
+      
+      // 3. 支払いをした人も追加
+      if (expenses) {
+        expenses.forEach(expense => {
+          if (!participants.includes(expense.payerName)) {
+            participants.push(expense.payerName);
+          }
+        });
+      }
+      
+      setUniqueParticipants(participants);
+    }
+  }, [event, attendances, expenses]);
   
   const addExpenseMutation = useMutation({
     mutationFn: async (data: typeof newExpense) => {
@@ -62,7 +119,9 @@ export default function ExpenseSplitting() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
       queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
-      setNewExpense({ payerName: '', description: '', amount: '' });
+      setNewExpense({ payerName: '', description: '', amount: '', participants: [] });
+      setIsSelectingParticipants(false);
+      setIsAddingNewPayer(false);
       toast({
         title: "支払いを記録しました",
       });
@@ -169,7 +228,14 @@ export default function ExpenseSplitting() {
   }
   
   // Calculate totals
-  const totalExpenses = expenses?.reduce((sum, expense) => sum + expense.amount, 0) || 0;
+  const totalExpenses = expenses?.reduce((sum, expense) => {
+    // amount が string または number の場合があるので数値に変換
+    const expenseAmount = typeof expense.amount === 'string' 
+      ? parseFloat(expense.amount) 
+      : Number(expense.amount);
+    return sum + expenseAmount;
+  }, 0) || 0;
+  
   const participantCount = expenses?.reduce((participants, expense) => {
     if (!participants.includes(expense.payerName)) {
       participants.push(expense.payerName);
@@ -226,13 +292,58 @@ export default function ExpenseSplitting() {
             <form onSubmit={handleAddExpense} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="payerName">支払者</Label>
-                <Input
-                  id="payerName"
-                  value={newExpense.payerName}
-                  onChange={(e) => setNewExpense({...newExpense, payerName: e.target.value})}
-                  placeholder="例: 田中 健太"
-                  required
-                />
+                
+                {isAddingNewPayer ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        id="payerName"
+                        value={newExpense.payerName}
+                        onChange={(e) => setNewExpense({...newExpense, payerName: e.target.value})}
+                        placeholder="新しい支払者の名前"
+                        className="flex-1"
+                      />
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setIsAddingNewPayer(false)}
+                      >
+                        既存から選択
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select
+                      value={newExpense.payerName}
+                      onValueChange={(value) => setNewExpense({...newExpense, payerName: value})}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="支払者を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniqueParticipants.map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setIsAddingNewPayer(true);
+                        setNewExpense({...newExpense, payerName: ''});
+                      }}
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      新規
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -263,6 +374,94 @@ export default function ExpenseSplitting() {
                 </div>
               </div>
               
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>割り勘対象者</Label>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setIsSelectingParticipants(!isSelectingParticipants)}
+                    className="h-7 text-xs"
+                  >
+                    {isSelectingParticipants ? '完了' : '対象者を選択'}
+                  </Button>
+                </div>
+                
+                {isSelectingParticipants ? (
+                  <div className="border rounded-md p-3 space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="select-all" 
+                        checked={selectAllParticipants}
+                        onCheckedChange={(checked) => {
+                          setSelectAllParticipants(!!checked);
+                          if (checked) {
+                            // 全員選択
+                            setNewExpense({...newExpense, participants: [...uniqueParticipants]});
+                          } else {
+                            // 全員選択解除
+                            setNewExpense({...newExpense, participants: []});
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor="select-all" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        全員を選択
+                      </label>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      {uniqueParticipants.map((name) => (
+                        <div key={name} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`participant-${name}`} 
+                            checked={newExpense.participants.includes(name)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                // 参加者を追加
+                                setNewExpense({
+                                  ...newExpense, 
+                                  participants: [...newExpense.participants, name]
+                                });
+                              } else {
+                                // 参加者を削除
+                                setNewExpense({
+                                  ...newExpense, 
+                                  participants: newExpense.participants.filter(p => p !== name)
+                                });
+                                setSelectAllParticipants(false);
+                              }
+                            }}
+                          />
+                          <label 
+                            htmlFor={`participant-${name}`} 
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border rounded-md p-3">
+                    {newExpense.participants.length > 0 ? (
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2 text-primary/70" />
+                        <p className="text-sm">
+                          {newExpense.participants.length}人が選択されています
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">全員で割り勘します</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              
               <Button 
                 type="submit" 
                 className="w-full" 
@@ -277,28 +476,43 @@ export default function ExpenseSplitting() {
               <div className="space-y-2 mt-4">
                 <h3 className="font-medium text-sm text-slate-700">記録された支払い</h3>
                 <div className="space-y-2">
-                  {expenses.map((expense) => (
-                    <div 
-                      key={expense.id} 
-                      className="flex items-center justify-between p-3 border rounded-md"
-                    >
-                      <div>
-                        <p className="font-medium">{expense.payerName}</p>
-                        <p className="text-sm text-slate-500">{expense.description}</p>
+                  {expenses.map((expense) => {
+                    // amount を数値に変換
+                    const expenseAmount = typeof expense.amount === 'string' 
+                      ? parseFloat(expense.amount) 
+                      : Number(expense.amount);
+                      
+                    return (
+                      <div 
+                        key={expense.id} 
+                        className="flex items-center justify-between p-3 border rounded-md"
+                      >
+                        <div>
+                          <p className="font-medium">{expense.payerName}</p>
+                          <p className="text-sm text-slate-500">{expense.description}</p>
+                          {expense.participants && expense.participants.length > 0 && (
+                            <div className="flex items-center mt-1">
+                              <Users className="h-3 w-3 mr-1 text-slate-400" />
+                              <p className="text-xs text-slate-400">
+                                {expense.participants.length}人で分割
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{formatCurrency(expenseAmount)}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteExpenseMutation.mutate(expense.id)}
+                            disabled={deleteExpenseMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{formatCurrency(expense.amount)}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                          disabled={deleteExpenseMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (

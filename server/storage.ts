@@ -213,6 +213,7 @@ export class MemStorage implements IStorage {
   async createExpense(expense: InsertExpense & { id: string }): Promise<Expense> {
     const newExpense = {
       ...expense,
+      participants: expense.participants || [],
       createdAt: new Date(),
     };
     this.expenses.set(expense.id, newExpense);

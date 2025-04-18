@@ -342,7 +342,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
       splitParticipants.forEach(p => allParticipants.add(p));
     } else {
       // 参加者が指定されていない場合は、その時点でのすべての支払い者で分割
-      const currentPayers = [...allParticipants];
+      const currentPayers = Array.from(allParticipants);
       splitParticipants = currentPayers;
     }
     
