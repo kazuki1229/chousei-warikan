@@ -314,200 +314,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function calculateSettlements(expenses: any[]): { from: string; to: string; amount: number }[] {
   if (!expenses.length) return [];
   
-  // すべての参加者を集める
-  const allParticipants = new Set<string>();
+  // 1. 全ての参加者を集める
+  const participants = new Set<string>();
   
-  // まずは全ての支払者と全ての参加者を集める
   expenses.forEach(expense => {
     // 支払者を追加
-    allParticipants.add(expense.payerName);
+    participants.add(expense.payerName);
     
-    // 参加者が指定されている場合は参加者リストに追加
+    // 参加者リストを追加
     if (expense.participants && expense.participants.length > 0) {
-      expense.participants.forEach((p: string) => allParticipants.add(p));
+      expense.participants.forEach((p: string) => participants.add(p));
+    } else {
+      // 参加者が指定されていない場合、その時点で登録されている全員を追加
+      // 注: この場合はループが完了するまで全員を確定できないが、支払者だけは確実に含まれる
     }
   });
   
-  // 各参加者の支払合計額と負担額を計算するオブジェクト
-  const participantTotals: { 
-    [key: string]: { 
-      paid: number;      // 支払った合計額
-      shouldPay: number; // 負担すべき合計額 
-    } 
-  } = {};
+  // 参加者の名前を配列に変換
+  const participantList = Array.from(participants);
   
-  // 全ての参加者の支払いと負担額を0で初期化
-  Array.from(allParticipants).forEach(person => {
-    participantTotals[person] = { paid: 0, shouldPay: 0 };
+  // 2. 各参加者の支払い金額と負担金額を計算
+  const balanceData: { [key: string]: { paid: number, shouldPay: number } } = {};
+  
+  // 初期化
+  participantList.forEach(name => {
+    balanceData[name] = { paid: 0, shouldPay: 0 };
   });
   
-  // 各支出について、支払額と負担額を計算
+  // 各支出に対して精算計算
   expenses.forEach(expense => {
-    const amount = Math.round(Number(expense.amount)); // 金額を整数に
+    const amount = Math.round(Number(expense.amount)); // 円単位なので整数に
     const payerName = expense.payerName;
     
-    // 支払者の支払い合計に加算
-    participantTotals[payerName].paid += amount;
+    // 支払者の支払額を加算
+    balanceData[payerName].paid += amount;
     
-    // 指定された参加者間で分割する
-    let splitParticipants: string[] = [];
+    // 分割対象者を決定
+    let splitTargets: string[];
     
-    // 参加者が指定されている場合はその参加者で分割
     if (expense.participants && expense.participants.length > 0) {
-      splitParticipants = expense.participants;
+      // 特定の参加者間で分割
+      splitTargets = expense.participants;
     } else {
-      // 参加者が指定されていない場合は、全員で分割
-      splitParticipants = Array.from(allParticipants);
+      // 全員で分割
+      splitTargets = participantList;
     }
     
-    // 各参加者の負担額を計算（小数点以下を四捨五入）
-    // 端数処理のため合計を取る
-    let totalSplit = 0;
-    const perPersonAmount = Math.floor(amount / splitParticipants.length);
+    // 一人あたりの金額計算（小数点以下切り捨て）
+    const perPersonBase = Math.floor(amount / splitTargets.length);
+    // 余りの計算
+    const remainder = amount - (perPersonBase * splitTargets.length);
     
-    // まずは普通に割り当て
-    splitParticipants.forEach(person => {
-      participantTotals[person].shouldPay += perPersonAmount;
-      totalSplit += perPersonAmount;
-    });
-    
-    // 端数の処理（1円ずつ割り当て）
-    const remainder = amount - totalSplit;
-    for (let i = 0; i < remainder; i++) {
-      if (i < splitParticipants.length) {
-        participantTotals[splitParticipants[i]].shouldPay += 1;
+    // 各参加者の負担額を加算
+    splitTargets.forEach((person, index) => {
+      // 基本金額を負担額に加算
+      balanceData[person].shouldPay += perPersonBase;
+      
+      // 端数処理: 先頭から remainder 人に 1円ずつ追加
+      if (index < remainder) {
+        balanceData[person].shouldPay += 1;
       }
-    }
+    });
   });
   
-  // Generate settlements
+  // 3. 最終的な貸し借り計算
   const settlements: { from: string; to: string; amount: number }[] = [];
   
-  // 精算額の計算: 誰が誰にいくら払うべきか
-  // 各参加者の差額を計算 (paid - shouldPay)
-  const balances: { [key: string]: number } = {};
+  // 各参加者の貸し借り状況を計算
+  const balances: { name: string, balance: number }[] = [];
   
-  Object.entries(participantTotals).forEach(([person, totals]) => {
-    balances[person] = totals.paid - totals.shouldPay;
+  Object.entries(balanceData).forEach(([name, data]) => {
+    const balance = data.paid - data.shouldPay; // プラスなら貸し、マイナスなら借り
+    balances.push({ name, balance });
     
-    // デバッグログ（必要に応じてコメントアウト）
-    // console.log(`${person}: 支払額=${totals.paid}円, 負担額=${totals.shouldPay}円, 差額=${balances[person]}円`);
+    // デバッグ用
+    // console.log(`${name}: 支払額=${data.paid}円, 負担額=${data.shouldPay}円, 差額=${balance}円`);
   });
   
-  // 支払う側（残高がマイナス）と受け取る側（残高がプラス）に分ける
-  const payers: { name: string; amount: number }[] = [];
-  const receivers: { name: string; amount: number }[] = [];
+  // 支払う人と受け取る人に分ける
+  const debtors = balances.filter(p => p.balance < 0).map(p => ({ name: p.name, amount: -p.balance }));
+  const creditors = balances.filter(p => p.balance > 0).map(p => ({ name: p.name, amount: p.balance }));
   
-  Object.entries(balances).forEach(([person, balance]) => {
-    if (balance < -0.01) {
-      // 負の残高 -> 支払う側
-      payers.push({ name: person, amount: -balance });
-    } else if (balance > 0.01) {
-      // 正の残高 -> 受け取る側
-      receivers.push({ name: person, amount: balance });
-    }
-  });
-  
-  // 最適化ステップ1: 支払者を少額順に並べることで、早く清算を完了する人を優先
-  // Sort by amount (descending for receivers, ascending for payers)
-  payers.sort((a, b) => a.amount - b.amount);
-  receivers.sort((a, b) => b.amount - a.amount);
-  
-  // 最適化ステップ2: まずは直接支払いを生成
-  const directSettlements: { from: string; to: string; amount: number }[] = [];
-  
-  // Match payers with receivers for direct settlements
-  const tempPayers = [...payers];
-  const tempReceivers = [...receivers];
-  
-  while (tempPayers.length > 0 && tempReceivers.length > 0) {
-    const payer = tempPayers[0];
-    const receiver = tempReceivers[0];
+  // 貸し借りの組み合わせを作成
+  while (debtors.length > 0 && creditors.length > 0) {
+    const debtor = debtors[0]; // 借りている人（支払う人）
+    const creditor = creditors[0]; // 貸している人（受け取る人）
     
-    const amount = Math.min(payer.amount, receiver.amount);
+    // どちらか少ない方の金額で精算
+    const settleAmount = Math.min(debtor.amount, creditor.amount);
     
-    if (amount > 0) {
-      directSettlements.push({
-        from: payer.name,
-        to: receiver.name,
-        amount: Math.round(amount), // 小数点以下を四捨五入
+    if (settleAmount > 0) {
+      // 精算: 借りている人 → 貸している人
+      settlements.push({
+        from: debtor.name,
+        to: creditor.name,
+        amount: Math.round(settleAmount), // 整数にする
       });
     }
     
-    payer.amount -= amount;
-    receiver.amount -= amount;
+    // 金額を更新
+    debtor.amount -= settleAmount;
+    creditor.amount -= settleAmount;
     
-    if (payer.amount < 0.01) tempPayers.shift();
-    if (receiver.amount < 0.01) tempReceivers.shift();
+    // 0になった人を配列から削除
+    if (debtor.amount < 0.01) debtors.shift();
+    if (creditor.amount < 0.01) creditors.shift();
   }
   
-  // 最適化ステップ3: 支払いネットワークを最適化して、取引回数を減らす
-  if (directSettlements.length <= 2) {
-    // 支払い回数が少ない場合は最適化の必要がないのでそのまま返す
-    return directSettlements;
-  }
-  
-  // 支払いグラフを構築
-  const graph: { [key: string]: { [key: string]: number } } = {};
-  
-  // グラフの初期化
-  const graphParticipants = new Set<string>();
-  directSettlements.forEach(s => {
-    graphParticipants.add(s.from);
-    graphParticipants.add(s.to);
-  });
-  
-  Array.from(graphParticipants).forEach(person => {
-    graph[person] = {};
-  });
-  
-  // 直接支払いをグラフにマッピング
-  directSettlements.forEach(s => {
-    graph[s.from][s.to] = (graph[s.from][s.to] || 0) + s.amount;
-  });
-  
-  // フロイド-ワーシャルアルゴリズムを使用して、間接支払いの可能性を見つける
-  Array.from(graphParticipants).forEach(k => {
-    Array.from(graphParticipants).forEach(i => {
-      if (i !== k) {
-        Array.from(graphParticipants).forEach(j => {
-          if (j !== i && j !== k && 
-              graph[i][k] !== undefined && 
-              graph[k][j] !== undefined) {
-            // i -> k -> j の間接経路が存在する場合
-            const throughK = Math.min(graph[i][k], graph[k][j]);
-            
-            // i -> j への直接経路があれば更新、なければ作成
-            if (graph[i][j] === undefined) {
-              graph[i][j] = 0;
-            }
-            
-            graph[i][j] += throughK;
-            graph[i][k] -= throughK;
-            graph[k][j] -= throughK;
-            
-            // 0になった経路を削除
-            if (Math.abs(graph[i][k]) < 0.01) delete graph[i][k];
-            if (Math.abs(graph[k][j]) < 0.01) delete graph[k][j];
-          }
-        });
-      }
-    });
-  });
-  
-  // 最適化されたグラフから精算リストを構築
-  Object.entries(graph).forEach(([from, toMap]) => {
-    Object.entries(toMap).forEach(([to, amount]) => {
-      if (amount > 0.01) {
-        settlements.push({
-          from,
-          to,
-          amount: Math.round(amount), // 小数点以下を四捨五入
-        });
-      }
-    });
-  });
-  
-  // もし最適化によって支払いが増えた場合は、元の直接支払いを使用
-  return settlements.length < directSettlements.length ? settlements : directSettlements;
+  return settlements;
 }
