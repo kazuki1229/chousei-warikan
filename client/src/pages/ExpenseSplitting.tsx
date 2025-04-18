@@ -177,7 +177,13 @@ export default function ExpenseSplitting() {
       return;
     }
     
-    addExpenseMutation.mutate(newExpense);
+    // participants が空の場合、全参加者を割り勘対象とする
+    const expenseToSubmit = { ...newExpense };
+    if (!expenseToSubmit.participants || expenseToSubmit.participants.length === 0) {
+      expenseToSubmit.participants = [...uniqueParticipants];
+    }
+    
+    addExpenseMutation.mutate(expenseToSubmit);
   };
   
   const isLoading = eventLoading || expensesLoading || settlementsLoading;
