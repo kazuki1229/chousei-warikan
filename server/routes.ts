@@ -328,17 +328,26 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     }
   });
   
-  // 各支出の計算を行う
-  const personalBalances: { [key: string]: number } = {};
+  // 各参加者の支払合計額と負担額を計算するオブジェクト
+  const participantTotals: { 
+    [key: string]: { 
+      paid: number;      // 支払った合計額
+      shouldPay: number; // 負担すべき合計額 
+    } 
+  } = {};
   
-  // 全ての参加者の残高を0で初期化
+  // 全ての参加者の支払いと負担額を0で初期化
   Array.from(allParticipants).forEach(person => {
-    personalBalances[person] = 0;
+    participantTotals[person] = { paid: 0, shouldPay: 0 };
   });
   
+  // 各支出について、支払額と負担額を計算
   expenses.forEach(expense => {
-    const amount = Number(expense.amount);
+    const amount = Math.round(Number(expense.amount)); // 金額を整数に
     const payerName = expense.payerName;
+    
+    // 支払者の支払い合計に加算
+    participantTotals[payerName].paid += amount;
     
     // 指定された参加者間で分割する
     let splitParticipants: string[] = [];
@@ -351,33 +360,50 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
       splitParticipants = Array.from(allParticipants);
     }
     
-    // 各参加者が支払うべき金額を計算
-    const perPersonAmount = amount / splitParticipants.length;
+    // 各参加者の負担額を計算（小数点以下を四捨五入）
+    // 端数処理のため合計を取る
+    let totalSplit = 0;
+    const perPersonAmount = Math.floor(amount / splitParticipants.length);
     
-    // 支払者自身も分担額を持つことに注意
+    // まずは普通に割り当て
     splitParticipants.forEach(person => {
-      if (person === payerName) {
-        // 支払者の場合: 立て替え総額から自分の負担分を引いた額がプラス（受け取るべき額）
-        personalBalances[payerName] += (amount - perPersonAmount);
-      } else {
-        // その他の参加者: 負担分を引く（支払うべき額）
-        personalBalances[person] -= perPersonAmount;
-      }
+      participantTotals[person].shouldPay += perPersonAmount;
+      totalSplit += perPersonAmount;
     });
+    
+    // 端数の処理（1円ずつ割り当て）
+    const remainder = amount - totalSplit;
+    for (let i = 0; i < remainder; i++) {
+      if (i < splitParticipants.length) {
+        participantTotals[splitParticipants[i]].shouldPay += 1;
+      }
+    }
   });
   
   // Generate settlements
   const settlements: { from: string; to: string; amount: number }[] = [];
   
   // 精算額の計算: 誰が誰にいくら払うべきか
-  // Find payers (negative balance) and receivers (positive balance)
+  // 各参加者の差額を計算 (paid - shouldPay)
+  const balances: { [key: string]: number } = {};
+  
+  Object.entries(participantTotals).forEach(([person, totals]) => {
+    balances[person] = totals.paid - totals.shouldPay;
+    
+    // デバッグログ（必要に応じてコメントアウト）
+    // console.log(`${person}: 支払額=${totals.paid}円, 負担額=${totals.shouldPay}円, 差額=${balances[person]}円`);
+  });
+  
+  // 支払う側（残高がマイナス）と受け取る側（残高がプラス）に分ける
   const payers: { name: string; amount: number }[] = [];
   const receivers: { name: string; amount: number }[] = [];
   
-  Object.entries(personalBalances).forEach(([person, balance]) => {
+  Object.entries(balances).forEach(([person, balance]) => {
     if (balance < -0.01) {
+      // 負の残高 -> 支払う側
       payers.push({ name: person, amount: -balance });
     } else if (balance > 0.01) {
+      // 正の残高 -> 受け取る側
       receivers.push({ name: person, amount: balance });
     }
   });
