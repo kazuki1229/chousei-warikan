@@ -280,7 +280,7 @@ export default function EventAttendance() {
       <IdentificationDialog
         isOpen={isIdentificationOpen && !participantId}
         onClose={() => setIsIdentificationOpen(false)}
-        eventId={id}
+        eventId={id || ''}
         onIdentify={handleIdentify}
       />
     </div>

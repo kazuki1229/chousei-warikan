@@ -59,7 +59,13 @@ export class MemStorage implements IStorage {
   async createEvent(event: InsertEvent & { id: string }): Promise<Event> {
     const newEvent = {
       ...event,
-      createdAt: new Date().toISOString(),
+      description: event.description || null,
+      selectedDate: event.selectedDate || null,
+      startTime: event.startTime || null,
+      endTime: event.endTime || null,
+      defaultStartTime: event.defaultStartTime || null,
+      defaultEndTime: event.defaultEndTime || null,
+      createdAt: new Date(),
       participantsCount: 0,
       dateOptions: [],
     };
@@ -124,7 +130,7 @@ export class MemStorage implements IStorage {
   async createAttendance(attendance: InsertAttendance & { id: string }): Promise<Attendance> {
     const newAttendance = {
       ...attendance,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
       responses: [],
     };
     this.attendances.set(attendance.id, newAttendance);
@@ -207,7 +213,7 @@ export class MemStorage implements IStorage {
   async createExpense(expense: InsertExpense & { id: string }): Promise<Expense> {
     const newExpense = {
       ...expense,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
     this.expenses.set(expense.id, newExpense);
     return newExpense;

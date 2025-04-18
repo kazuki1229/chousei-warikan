@@ -324,7 +324,7 @@ export default function EventDetail() {
       <IdentificationDialog
         isOpen={isIdentificationOpen}
         onClose={() => setIsIdentificationOpen(false)}
-        eventId={id}
+        eventId={id || ''}
         onIdentify={handleIdentify}
       />
     </div>
