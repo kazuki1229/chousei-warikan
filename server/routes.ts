@@ -334,13 +334,13 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     }
   });
   
-  const participants = Array.from(allParticipantsSet);
-  console.log("すべての参加者:", participants);
+  const allCurrentParticipants = Array.from(allParticipantsSet);
+  console.log("すべての参加者:", allCurrentParticipants);
   
   // ステップ2: 各参加者の支払い/負担記録を初期化
   const balanceSheet: Record<string, { paid: number, shouldPay: number }> = {};
   
-  participants.forEach(name => {
+  allCurrentParticipants.forEach((name: string) => {
     balanceSheet[name] = { paid: 0, shouldPay: 0 };
   });
   
@@ -355,16 +355,17 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
     // 支払者の支払額に加算
     balanceSheet[payerName].paid += amount;
     
-    // 分担者を確定
+    // 重要: 分担者を確定
     let splitParticipants: string[] = [];
     
-    // すべての支出について、参加者を明示的に指定するか全員で分ける
     if (expense.participants && expense.participants.length > 0) {
-      // 明示的に指定された参加者で分割
-      splitParticipants = expense.participants;
+      // 明示的に指定された参加者のリスト
+      splitParticipants = [...expense.participants];
+      console.log(`明示的に指定された参加者: ${splitParticipants.join(', ')}`);
     } else {
-      // 全員で分割（すべての参加者）
-      splitParticipants = participants;
+      // 「全員で割り勘」のケース - 現在の全参加者で分ける
+      splitParticipants = [...allCurrentParticipants];
+      console.log(`全員で割り勘: ${splitParticipants.length}人`);
     }
     
     console.log(`分担者(${splitParticipants.length}人): ${splitParticipants.join(', ')}`);
@@ -396,7 +397,7 @@ function calculateSettlements(expenses: any[]): { from: string; to: string; amou
   // 各参加者の最終的な収支（+なら受取、-なら支払）
   const finalBalances: { name: string, amount: number }[] = [];
   
-  participants.forEach(name => {
+  allCurrentParticipants.forEach((name: string) => {
     const { paid, shouldPay } = balanceSheet[name];
     const balance = paid - shouldPay; // プラスなら受け取り、マイナスなら支払い
     
