@@ -21,6 +21,7 @@ import {
   Loader2,
   BookmarkPlus
 } from 'lucide-react';
+import EventMemo from '@/components/EventMemo';
 import { useToast } from '@/hooks/use-toast';
 import IdentificationDialog from '@/components/IdentificationDialog';
 import { Event, Attendance, Expense } from '@shared/schema';
@@ -297,6 +298,10 @@ export default function EventDetail() {
             <Users className="h-4 w-4" />
             参加者
           </TabsTrigger>
+          <TabsTrigger value="memo" className="flex items-center gap-2">
+            <BookmarkPlus className="h-4 w-4" />
+            メモ
+          </TabsTrigger>
           <TabsTrigger value="expenses" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             費用精算
@@ -536,6 +541,10 @@ export default function EventDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="memo">
+          <EventMemo eventId={id || ''} />
         </TabsContent>
         
         <TabsContent value="expenses">
