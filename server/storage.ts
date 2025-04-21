@@ -8,7 +8,14 @@ import {
   DateOption,
   Attendance,
   Expense,
+  events,
+  dateOptions,
+  attendances,
+  attendanceResponses,
+  expenses
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Event methods
@@ -410,4 +417,485 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // Event methods
+  async createEvent(event: InsertEvent & { id: string }): Promise<Event> {
+    const eventData = {
+      ...event,
+      id: event.id
+    };
+    
+    const [newEvent] = await db.insert(events).values(eventData).returning();
+    return { ...newEvent, dateOptions: [] };
+  }
+  
+  async getEvent(id: string): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    if (!event) return undefined;
+    
+    // Get date options for this event
+    const eventDateOptions = await this.getEventDateOptions(id);
+    
+    return {
+      ...event,
+      dateOptions: eventDateOptions,
+      memoEditLock: event.memoEditLock ? event.memoEditLock as any : undefined
+    };
+  }
+  
+  async getAllEvents(): Promise<Event[]> {
+    const allEvents = await db.select().from(events);
+    
+    // For each event, get its date options
+    const eventsWithDateOptions = await Promise.all(
+      allEvents.map(async (event) => {
+        const eventDateOptions = await this.getEventDateOptions(event.id);
+        return {
+          ...event,
+          dateOptions: eventDateOptions,
+          memoEditLock: event.memoEditLock ? event.memoEditLock as any : undefined
+        };
+      })
+    );
+    
+    return eventsWithDateOptions;
+  }
+  
+  async updateEvent(id: string, data: Partial<InsertEvent>): Promise<Event> {
+    const [updatedEvent] = await db
+      .update(events)
+      .set(data)
+      .where(eq(events.id, id))
+      .returning();
+    
+    if (!updatedEvent) {
+      throw new Error("Event not found");
+    }
+    
+    // Get date options for this event
+    const eventDateOptions = await this.getEventDateOptions(id);
+    
+    return {
+      ...updatedEvent,
+      dateOptions: eventDateOptions,
+      memoEditLock: updatedEvent.memoEditLock ? updatedEvent.memoEditLock as any : undefined
+    };
+  }
+  
+  // DateOption methods
+  async createDateOption(dateOption: InsertDateOption & { id: string }): Promise<DateOption> {
+    const [newDateOption] = await db
+      .insert(dateOptions)
+      .values(dateOption)
+      .returning();
+    
+    return newDateOption;
+  }
+  
+  async getDateOption(id: string): Promise<DateOption | undefined> {
+    const [option] = await db
+      .select()
+      .from(dateOptions)
+      .where(eq(dateOptions.id, id));
+    
+    return option;
+  }
+  
+  async getEventDateOptions(eventId: string): Promise<DateOption[]> {
+    return db
+      .select()
+      .from(dateOptions)
+      .where(eq(dateOptions.eventId, eventId));
+  }
+  
+  // Attendance methods
+  async createAttendance(attendance: InsertAttendance & { id: string }): Promise<Attendance> {
+    const [newAttendance] = await db
+      .insert(attendances)
+      .values(attendance)
+      .returning();
+    
+    return { ...newAttendance, responses: [] };
+  }
+  
+  async getAttendance(id: string): Promise<Attendance | undefined> {
+    const [attendance] = await db
+      .select()
+      .from(attendances)
+      .where(eq(attendances.id, id));
+    
+    if (!attendance) return undefined;
+    
+    // Get responses for this attendance
+    const responses = await this.getAttendanceResponses(id);
+    
+    return {
+      ...attendance,
+      responses
+    };
+  }
+  
+  async getAttendanceByEmail(eventId: string, email: string): Promise<Attendance | undefined> {
+    // メールアドレスを使用しなくなったため、この関数は常にundefinedを返す
+    return undefined;
+  }
+  
+  async getEventAttendances(eventId: string): Promise<Attendance[]> {
+    const attendancesList = await db
+      .select()
+      .from(attendances)
+      .where(eq(attendances.eventId, eventId));
+    
+    // For each attendance, get its responses
+    const attendancesWithResponses = await Promise.all(
+      attendancesList.map(async (attendance) => {
+        const responses = await this.getAttendanceResponses(attendance.id);
+        return {
+          ...attendance,
+          responses
+        };
+      })
+    );
+    
+    return attendancesWithResponses;
+  }
+  
+  // AttendanceResponse methods
+  async createAttendanceResponse(response: InsertAttendanceResponse): Promise<any> {
+    const [newResponse] = await db
+      .insert(attendanceResponses)
+      .values(response)
+      .returning();
+    
+    return newResponse;
+  }
+  
+  async updateAttendanceResponses(attendanceId: string, responses: { dateOptionId: string, status: string }[]): Promise<void> {
+    // First, delete existing responses for this attendance
+    await db
+      .delete(attendanceResponses)
+      .where(eq(attendanceResponses.attendanceId, attendanceId));
+    
+    // Then, insert the new responses
+    if (responses.length > 0) {
+      await db.insert(attendanceResponses).values(
+        responses.map(resp => ({
+          attendanceId,
+          dateOptionId: resp.dateOptionId,
+          status: resp.status
+        }))
+      );
+    }
+  }
+  
+  async getAttendanceResponses(attendanceId: string): Promise<any[]> {
+    return db
+      .select()
+      .from(attendanceResponses)
+      .where(eq(attendanceResponses.attendanceId, attendanceId));
+  }
+  
+  // Expense methods
+  async createExpense(expense: InsertExpense & { id: string }): Promise<Expense> {
+    const expenseData = {
+      ...expense,
+      isSharedWithAll: expense.isSharedWithAll ?? false
+    };
+    
+    const [newExpense] = await db
+      .insert(expenses)
+      .values(expenseData)
+      .returning();
+    
+    return newExpense;
+  }
+  
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db
+      .select()
+      .from(expenses)
+      .where(eq(expenses.id, id));
+    
+    return expense;
+  }
+  
+  async getEventExpenses(eventId: string): Promise<Expense[]> {
+    return db
+      .select()
+      .from(expenses)
+      .where(eq(expenses.eventId, eventId));
+  }
+  
+  // 全員割り勘フラグを持つ支出のみを取得
+  async getSharedExpenses(eventId: string): Promise<Expense[]> {
+    return db
+      .select()
+      .from(expenses)
+      .where(and(
+        eq(expenses.eventId, eventId),
+        eq(expenses.isSharedWithAll, true)
+      ));
+  }
+  
+  async updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense> {
+    const [updatedExpense] = await db
+      .update(expenses)
+      .set(data)
+      .where(eq(expenses.id, id))
+      .returning();
+    
+    if (!updatedExpense) {
+      throw new Error("Expense not found");
+    }
+    
+    return updatedExpense;
+  }
+  
+  async deleteExpense(id: string): Promise<void> {
+    await db
+      .delete(expenses)
+      .where(eq(expenses.id, id));
+  }
+  
+  // Memo methods
+  async updateEventMemo(eventId: string, memo: string, editorName: string): Promise<Event> {
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(eq(events.id, eventId));
+    
+    if (!event) {
+      throw new Error("Event not found");
+    }
+    
+    // メモを更新
+    const [updatedEvent] = await db
+      .update(events)
+      .set({
+        memo,
+        memoLastEditedBy: editorName,
+        memoLastEditedAt: new Date().toISOString(),
+        memoEditLock: null // 編集完了後はロックを解除
+      })
+      .where(eq(events.id, eventId))
+      .returning();
+    
+    // Get date options for this event
+    const eventDateOptions = await this.getEventDateOptions(eventId);
+    
+    return {
+      ...updatedEvent,
+      dateOptions: eventDateOptions,
+      memoEditLock: null
+    };
+  }
+  
+  async acquireEditLock(eventId: string, userName: string): Promise<boolean> {
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(eq(events.id, eventId));
+    
+    if (!event) {
+      throw new Error("Event not found");
+    }
+    
+    // 既存のロックを確認
+    const memoEditLock = event.memoEditLock as any;
+    if (memoEditLock) {
+      const lockExpiration = new Date(memoEditLock.lockExpiration);
+      
+      // まだロックが有効で、別のユーザーがロックを持っている場合
+      if (lockExpiration > new Date() && memoEditLock.lockedBy !== userName) {
+        return false;
+      }
+    }
+    
+    // ロックを設定
+    const now = new Date();
+    const lockExpiration = new Date(now);
+    lockExpiration.setMinutes(lockExpiration.getMinutes() + 5); // 5分間のロック
+    
+    const newLock = {
+      lockedBy: userName,
+      lockedAt: now.toISOString(),
+      lockExpiration: lockExpiration.toISOString()
+    };
+    
+    await db
+      .update(events)
+      .set({ memoEditLock: newLock })
+      .where(eq(events.id, eventId));
+    
+    return true;
+  }
+  
+  async releaseEditLock(eventId: string, userName: string): Promise<boolean> {
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(eq(events.id, eventId));
+    
+    if (!event) {
+      throw new Error("Event not found");
+    }
+    
+    // ロックを解除（すべてのケースで解除可能）
+    await db
+      .update(events)
+      .set({ memoEditLock: null })
+      .where(eq(events.id, eventId));
+    
+    return true;
+  }
+  
+  // Utility methods
+  async getEventParticipants(eventId: string): Promise<string[]> {
+    // 1. まず、出費情報から参加者を収集
+    const eventExpenses = await this.getEventExpenses(eventId);
+    const participantsSet = new Set<string>();
+    
+    // 支払い者を追加
+    eventExpenses.forEach(expense => {
+      if (expense.payerName) {
+        participantsSet.add(expense.payerName);
+      }
+    });
+    
+    // 分担者を追加
+    eventExpenses.forEach(expense => {
+      if (expense.participants) {
+        expense.participants.forEach(participant => {
+          participantsSet.add(participant);
+        });
+      }
+    });
+    
+    // 2. 出席者からも名前を収集
+    const attendances = await this.getEventAttendances(eventId);
+    attendances.forEach(attendance => {
+      participantsSet.add(attendance.name);
+    });
+    
+    // 3. イベント作成者も追加
+    const event = await this.getEvent(eventId);
+    if (event && event.creatorName) {
+      participantsSet.add(event.creatorName);
+    }
+    
+    return Array.from(participantsSet);
+  }
+}
+
+// Database migration helper (一度だけ実行される初期データ移行)
+async function migrateMemoryToDatabase(memStorage: MemStorage, dbStorage: DatabaseStorage) {
+  try {
+    console.log("🔄 Checking if data migration is needed...");
+    
+    // Check if tables exist and if database has data
+    try {
+      const allEvents = await db.select().from(events);
+      if (allEvents.length > 0) {
+        console.log("✅ Database already has data, skipping migration");
+        return;
+      }
+    } catch (error) {
+      console.log("⚠️ Tables not found, will be created during db:push");
+      return;
+    }
+    
+    console.log("🔄 Starting data migration from memory storage to database...");
+    
+    // 1. Migrate events with their date options
+    const memEvents = await memStorage.getAllEvents();
+    console.log(`Found ${memEvents.length} events to migrate`);
+    
+    for (const event of memEvents) {
+      // Insert event
+      const newEvent = await dbStorage.createEvent({
+        id: event.id,
+        title: event.title,
+        description: event.description || null,
+        creatorName: event.creatorName,
+        selectedDate: event.selectedDate || null,
+        startTime: event.startTime || null,
+        endTime: event.endTime || null,
+        defaultStartTime: event.defaultStartTime || null,
+        defaultEndTime: event.defaultEndTime || null,
+        participantsCount: event.participantsCount || 0,
+        participants: event.participants || [],
+        memo: event.memo || null,
+        memoLastEditedBy: event.memoLastEditedBy || null,
+        memoLastEditedAt: event.memoLastEditedAt || null,
+      });
+      
+      // If there's a memo edit lock, update it
+      if (event.memoEditLock) {
+        await db
+          .update(events)
+          .set({ memoEditLock: event.memoEditLock })
+          .where(eq(events.id, event.id));
+      }
+      
+      // Insert date options for this event
+      for (const dateOption of event.dateOptions) {
+        await dbStorage.createDateOption({
+          id: dateOption.id,
+          eventId: event.id,
+          date: dateOption.date,
+          startTime: dateOption.startTime,
+          endTime: dateOption.endTime
+        });
+      }
+      
+      // 2. Migrate attendances with their responses
+      const attendancesList = await memStorage.getEventAttendances(event.id);
+      for (const attendance of attendancesList) {
+        const newAttendance = await dbStorage.createAttendance({
+          id: attendance.id,
+          eventId: event.id,
+          name: attendance.name
+        });
+        
+        if (attendance.responses && attendance.responses.length > 0) {
+          await dbStorage.updateAttendanceResponses(
+            attendance.id,
+            attendance.responses.map(response => ({
+              dateOptionId: response.dateOptionId,
+              status: response.status
+            }))
+          );
+        }
+      }
+      
+      // 3. Migrate expenses
+      const expensesList = await memStorage.getEventExpenses(event.id);
+      for (const expense of expensesList) {
+        await dbStorage.createExpense({
+          id: expense.id,
+          eventId: event.id,
+          payerName: expense.payerName,
+          description: expense.description,
+          amount: expense.amount,
+          participants: expense.participants || [],
+          isSharedWithAll: expense.isSharedWithAll
+        });
+      }
+    }
+    
+    console.log("✅ Data migration completed successfully");
+  } catch (error) {
+    console.error("❌ Data migration failed:", error);
+  }
+}
+
+// For initial migration, create temporary instances of both storage types
+const memStorage = new MemStorage();
+const dbStorage = new DatabaseStorage();
+
+// Perform the migration
+migrateMemoryToDatabase(memStorage, dbStorage)
+  .catch(error => console.error("Migration error:", error));
+
+// Export the database storage
+export const storage = dbStorage;

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, numeric, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,6 +15,11 @@ export const events = pgTable("events", {
   defaultStartTime: text("default_start_time"),
   defaultEndTime: text("default_end_time"),
   participantsCount: integer("participants_count").default(0),
+  participants: text("participants").array(), // 精算機能で追加された参加者リスト
+  memo: text("memo"), // イベントメモ
+  memoLastEditedBy: text("memo_last_edited_by"), // メモ最終編集者名
+  memoLastEditedAt: text("memo_last_edited_at"), // メモ最終編集日時
+  memoEditLock: jsonb("memo_edit_lock") // ロック情報（JSON形式）
 });
 
 // Date options table
@@ -50,6 +55,7 @@ export const expenses = pgTable("expenses", {
   description: text("description").notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   participants: text("participants").array().default([]).notNull(), // 割り勘対象者の配列
+  isSharedWithAll: boolean("is_shared_with_all").default(false), // 全員割り勘フラグ
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
