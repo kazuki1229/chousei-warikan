@@ -70,9 +70,27 @@ export default function EventAttendance() {
   }, [event?.dateOptions]);
   
   const submitAttendanceMutation = useMutation({
-    mutationFn: async (data: { name: string; responses: DateResponse[] }) => {
-      const response = await apiRequest('POST', `/api/events/${id}/attendances`, data);
-      return response.json();
+    mutationFn: async (data: { name: string; responses?: DateResponse[] }) => {
+      // 確定済み日程の場合（既に決まっている場合）
+      if (event?.selectedDate) {
+        // ダミーの回答を作成（APIは必ず回答が必要なため）
+        const dummyResponse = {
+          name: data.name,
+          responses: [{
+            dateOptionId: event.dateOptions[0].id,
+            status: 'available' as AttendanceStatus
+          }]
+        };
+        const response = await apiRequest('POST', `/api/events/${id}/attendances`, dummyResponse);
+        return response.json();
+      } else {
+        // 通常の候補日選択の場合
+        const response = await apiRequest('POST', `/api/events/${id}/attendances`, {
+          name: data.name,
+          responses: data.responses || []
+        });
+        return response.json();
+      }
     },
     onSuccess: (data) => {
       setParticipantId(data.id);
@@ -105,9 +123,13 @@ export default function EventAttendance() {
         console.error('Failed to save recent event to localStorage:', error);
       }
       
+      const isConfirmedEvent = event?.selectedDate ? true : false;
+      
       toast({
-        title: "回答を送信しました",
-        description: "出欠回答ありがとうございます",
+        title: isConfirmedEvent ? "参加登録しました" : "回答を送信しました",
+        description: isConfirmedEvent 
+          ? `${data.name}さん、参加登録ありがとうございます` 
+          : "出欠回答ありがとうございます",
       });
       
       // 回答送信後はイベント詳細ページに遷移する
@@ -188,11 +210,11 @@ export default function EventAttendance() {
           <Check className="h-4 w-4" />
           <AlertTitle>日程が確定しています</AlertTitle>
           <AlertDescription>
-            このイベントの日程は確定しています。精算機能をご利用いただけます。
+            このイベントの日程は既に確定しています。参加者登録をして精算機能をご利用いただけます。
           </AlertDescription>
         </Alert>
         
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle>確定日程</CardTitle>
           </CardHeader>
@@ -209,8 +231,34 @@ export default function EventAttendance() {
                 </div>
               </div>
             </div>
-            
-            <div className="flex justify-between">
+          </CardContent>
+        </Card>
+        
+        {participantId ? (
+          // 参加者登録済みの場合
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>参加者登録完了</CardTitle>
+            </CardHeader>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-700 font-medium">{participantName}さんとして登録しました</p>
+                  <p className="text-slate-600 text-sm mt-1">このイベントの参加者として登録されました</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setParticipantId(null);
+                    setParticipantName('');
+                  }}
+                >
+                  別の参加者を選択
+                </Button>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4 flex justify-between">
               <Button 
                 variant="outline" 
                 onClick={() => navigate(`/event/${id}`)}
@@ -222,9 +270,79 @@ export default function EventAttendance() {
               >
                 精算ページへ
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardFooter>
+          </Card>
+        ) : (
+          // 参加者登録前の場合
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>参加者登録</CardTitle>
+              <CardDescription>
+                イベントに参加する方として登録してください
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {attendances && attendances.length > 0 ? (
+                <div>
+                  <div className="mb-4">
+                    <h3 className="font-medium mb-2">登録済み参加者</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {attendances.map((attendance) => (
+                        <Button 
+                          key={attendance.id} 
+                          variant="outline"
+                          className="hover:bg-primary/10"
+                          onClick={() => {
+                            setParticipantId(attendance.id);
+                            setParticipantName(attendance.name);
+                            
+                            toast({
+                              title: "参加者を選択しました",
+                              description: `${attendance.name}さんとして登録します`,
+                            });
+                          }}
+                        >
+                          {attendance.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center my-4">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <div className="px-2 text-slate-500 text-sm">または</div>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+                </div>
+              ) : null}
+              
+              <div>
+                <h3 className="font-medium mb-2">新しい参加者として登録</h3>
+                <Button 
+                  variant="default" 
+                  onClick={() => setIsIdentificationOpen(true)}
+                >
+                  新しい参加者として登録する
+                </Button>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/event/${id}`)}
+                className="w-full"
+              >
+                イベント詳細に戻る
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+        
+        <IdentificationDialog
+          isOpen={isIdentificationOpen && !participantId}
+          onClose={() => setIsIdentificationOpen(false)}
+          eventId={id || ''}
+          onIdentify={handleIdentify}
+        />
       </div>
     );
   }
