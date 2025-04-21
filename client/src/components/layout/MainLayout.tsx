@@ -24,10 +24,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* Top Navigation Bar - Mobile Friendly */}
       <header className="bg-white shadow-sm border-b border-slate-200 py-3 px-4 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="text-lg font-bold text-primary flex items-center">
-          <CalendarRange className="mr-2 h-5 w-5" />
-          調整ワリカン
-        </h1>
+        <Link href="/">
+          <h1 className="text-lg font-bold text-primary flex items-center cursor-pointer hover:opacity-80 transition-opacity">
+            <CalendarRange className="mr-2 h-5 w-5" />
+            調整ワリカン
+          </h1>
+        </Link>
         
         <button 
           onClick={toggleMenu}
@@ -82,40 +84,34 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
 // Desktop Navigation Link
 const NavLink = ({ href, icon, label, isActive }: { href: string, icon: React.ReactNode, label: string, isActive: boolean }) => (
-  <div
-    onClick={() => window.location.href = href}
-    className={`
+  <Link href={href} className={`
       cursor-pointer px-3 py-1.5 rounded-md flex items-center text-sm font-medium
       ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-100'}
     `}
   >
     <span className="mr-1.5">{icon}</span>
     {label}
-  </div>
+  </Link>
 );
 
 // Mobile Navigation Link for Side Drawer
 const MobileNavLink = ({ href, icon, label, isActive, onClick }: { href: string, icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) => (
-  <div 
+  <Link href={href}
     className={`
       flex items-center px-3 py-2.5 rounded-md text-sm cursor-pointer
       ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-100'}
     `}
-    onClick={() => {
-      onClick();
-      window.location.href = href;
-    }}
+    onClick={onClick}
   >
     <span className="mr-3">{icon}</span>
     <span>{label}</span>
-  </div>
+  </Link>
 );
 
 // Bottom Navigation Button for Mobile
 const NavButton = ({ href, icon, label, isActive }: { href: string, icon: React.ReactNode, label: string, isActive: boolean }) => (
-  <div 
+  <Link href={href}
     className="flex flex-col items-center justify-center w-1/2 cursor-pointer"
-    onClick={() => window.location.href = href}
   >
     <div className={`p-1 rounded-full ${isActive ? 'text-primary' : 'text-slate-600'}`}>
       {icon}
@@ -123,5 +119,5 @@ const NavButton = ({ href, icon, label, isActive }: { href: string, icon: React.
     <span className={`text-xs mt-1 ${isActive ? 'text-primary font-medium' : 'text-slate-600'}`}>
       {label}
     </span>
-  </div>
+  </Link>
 );
