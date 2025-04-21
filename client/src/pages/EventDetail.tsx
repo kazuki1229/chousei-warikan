@@ -36,19 +36,22 @@ export default function EventDetail() {
   const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
   const [allParticipants, setAllParticipants] = useState<string[]>([]);
   
-  const { data: event, isLoading } = useQuery<Event>({
+  const { data: event, isLoading, refetch: refetchEvent } = useQuery<Event>({
     queryKey: [`/api/events/${id}`],
+    refetchInterval: 5000, // 5秒ごとに再取得（参加者変更が反映されるように）
   });
   
-  const { data: attendances } = useQuery<Attendance[]>({
+  const { data: attendances, refetch: refetchAttendances } = useQuery<Attendance[]>({
     queryKey: [`/api/events/${id}/attendances`],
     enabled: !!event,
+    refetchInterval: 5000, // 5秒ごとに再取得
   });
   
   // 費用精算で追加された参加者を取得するためのクエリ
-  const { data: expenses } = useQuery<Expense[]>({
+  const { data: expenses, refetch: refetchExpenses } = useQuery<Expense[]>({
     queryKey: [`/api/events/${id}/expenses`],
     enabled: !!event && !!event.selectedDate,
+    refetchInterval: 5000, // 5秒ごとに再取得
   });
   
   // 全参加者リストを構築（出席情報+経費情報+イベント作成者から）
