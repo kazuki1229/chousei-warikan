@@ -1,0 +1,31 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#f1f5f9"/>
+  
+  <!-- グラデーション背景 -->
+  <rect width="1200" height="630" fill="url(#gradient)"/>
+  
+  <!-- タイトル部分 -->
+  <g>
+    <text x="600" y="250" font-family="'Noto Sans JP', sans-serif" font-size="80" font-weight="700" text-anchor="middle" fill="#1e293b">調整ワリカン</text>
+    <text x="600" y="320" font-family="'Noto Sans JP', sans-serif" font-size="40" font-weight="500" text-anchor="middle" fill="#64748b">イベント調整と費用精算を一度に</text>
+  </g>
+  
+  <!-- アイコン風の図形 -->
+  <g>
+    <circle cx="400" cy="450" r="70" fill="#f97316" fill-opacity="0.8"/>
+    <circle cx="600" cy="450" r="70" fill="#3b82f6" fill-opacity="0.8"/>
+    <circle cx="800" cy="450" r="70" fill="#10b981" fill-opacity="0.8"/>
+    
+    <!-- 線で接続 -->
+    <line x1="470" y1="450" x2="530" y2="450" stroke="#64748b" stroke-width="4"/>
+    <line x1="670" y1="450" x2="730" y2="450" stroke="#64748b" stroke-width="4"/>
+  </g>
+  
+  <!-- グラデーション定義 -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f1f5f9"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+</svg>
