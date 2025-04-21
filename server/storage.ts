@@ -40,6 +40,11 @@ export interface IStorage {
   updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
   
+  // Memo methods
+  updateEventMemo(eventId: string, memo: string, editorName: string): Promise<Event>;
+  acquireEditLock(eventId: string, userName: string): Promise<boolean>;
+  releaseEditLock(eventId: string, userName: string): Promise<boolean>;
+  
   // Utility methods
   getEventParticipants(eventId: string): Promise<string[]>;
 }
@@ -259,6 +264,90 @@ export class MemStorage implements IStorage {
     return updatedExpense;
   }
   
+  // Memo methods
+  async updateEventMemo(eventId: string, memo: string, editorName: string): Promise<Event> {
+    const event = this.events.get(eventId);
+    if (!event) throw new Error("Event not found");
+    
+    // 編集ロックの確認
+    if (event.memoEditLock) {
+      const lockExpiration = new Date(event.memoEditLock.lockExpiration);
+      if (lockExpiration > new Date() && event.memoEditLock.lockedBy !== editorName) {
+        throw new Error(`他の参加者（${event.memoEditLock.lockedBy}さん）が現在編集中です`);
+      }
+    }
+    
+    // メモを更新
+    const updatedEvent = {
+      ...event,
+      memo,
+      memoLastEditedBy: editorName,
+      memoLastEditedAt: new Date().toISOString(),
+      memoEditLock: null // 編集完了後はロックを解除
+    };
+    
+    this.events.set(eventId, updatedEvent);
+    
+    // Get date options for this event
+    const dateOptions = await this.getEventDateOptions(eventId);
+    
+    return {
+      ...updatedEvent,
+      dateOptions,
+    };
+  }
+  
+  async acquireEditLock(eventId: string, userName: string): Promise<boolean> {
+    const event = this.events.get(eventId);
+    if (!event) throw new Error("Event not found");
+    
+    // 既存のロックを確認
+    if (event.memoEditLock) {
+      const lockExpiration = new Date(event.memoEditLock.lockExpiration);
+      
+      // まだロックが有効で、別のユーザーがロックを持っている場合
+      if (lockExpiration > new Date() && event.memoEditLock.lockedBy !== userName) {
+        return false;
+      }
+    }
+    
+    // ロックを設定
+    const now = new Date();
+    const lockExpiration = new Date(now);
+    lockExpiration.setMinutes(lockExpiration.getMinutes() + 5); // 5分間のロック
+    
+    const updatedEvent = {
+      ...event,
+      memoEditLock: {
+        lockedBy: userName,
+        lockedAt: now.toISOString(),
+        lockExpiration: lockExpiration.toISOString()
+      }
+    };
+    
+    this.events.set(eventId, updatedEvent);
+    return true;
+  }
+  
+  async releaseEditLock(eventId: string, userName: string): Promise<boolean> {
+    const event = this.events.get(eventId);
+    if (!event) throw new Error("Event not found");
+    
+    // ロックの所有者確認
+    if (!event.memoEditLock || event.memoEditLock.lockedBy !== userName) {
+      return false;
+    }
+    
+    // ロックを解除
+    const updatedEvent = {
+      ...event,
+      memoEditLock: null
+    };
+    
+    this.events.set(eventId, updatedEvent);
+    return true;
+  }
+
   async getEventParticipants(eventId: string): Promise<string[]> {
     // イベントの全参加者を収集
     const event = await this.getEvent(eventId);

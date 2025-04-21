@@ -87,6 +87,14 @@ export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Event = typeof events.$inferSelect & {
   dateOptions: DateOption[];
   participants?: string[]; // 精算機能で追加された参加者リスト
+  memo?: string; // イベントメモ
+  memoLastEditedBy?: string; // メモ最終編集者名
+  memoLastEditedAt?: string; // メモ最終編集日時
+  memoEditLock?: {
+    lockedBy: string; // ロックを取得したユーザー名
+    lockedAt: string; // ロック取得時間
+    lockExpiration: string; // ロック有効期限
+  };
 };
 
 export type DateOption = typeof dateOptions.$inferSelect;
