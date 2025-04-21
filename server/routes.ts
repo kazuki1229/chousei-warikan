@@ -593,6 +593,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // イベントのメモを取得
+  app.get("/api/events/:id/memo", async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      res.json({
+        memo: event.memo || "",
+        lastEditedBy: event.memoLastEditedBy || null,
+        lastEditedAt: event.memoLastEditedAt || null,
+        editLock: event.memoEditLock || null
+      });
+    } catch (error) {
+      res.status(500).json({ message: "メモの取得に失敗しました" });
+    }
+  });
+  
+  // イベントのメモを更新
+  app.post("/api/events/:id/memo", async (req, res) => {
+    try {
+      const schema = z.object({
+        memo: z.string().max(1000, "メモは1000文字以内で入力してください"),
+        editorName: z.string().min(1, "編集者名を入力してください"),
+      });
+      
+      const { memo, editorName } = schema.parse(req.body);
+      
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      // メモを更新
+      const updatedEvent = await storage.updateEventMemo(req.params.id, memo, editorName);
+      
+      res.json({
+        memo: updatedEvent.memo,
+        lastEditedBy: updatedEvent.memoLastEditedBy,
+        lastEditedAt: updatedEvent.memoLastEditedAt
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else if (error instanceof Error && error.message.includes("他の参加者")) {
+        res.status(409).json({ message: error.message }); // Conflict
+      } else {
+        res.status(500).json({ message: "メモの更新に失敗しました" });
+      }
+    }
+  });
+  
+  // 編集ロックを取得
+  app.post("/api/events/:id/memo/lock", async (req, res) => {
+    try {
+      const schema = z.object({
+        userName: z.string().min(1, "ユーザー名を入力してください"),
+      });
+      
+      const { userName } = schema.parse(req.body);
+      
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      // ロックを取得
+      const success = await storage.acquireEditLock(req.params.id, userName);
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        const updatedEvent = await storage.getEvent(req.params.id);
+        res.status(409).json({ 
+          success: false, 
+          message: `他の参加者（${updatedEvent?.memoEditLock?.lockedBy}さん）が現在編集中です`,
+          lockInfo: updatedEvent?.memoEditLock
+        });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        res.status(500).json({ message: "編集ロックの取得に失敗しました" });
+      }
+    }
+  });
+  
+  // 編集ロックを解放
+  app.post("/api/events/:id/memo/unlock", async (req, res) => {
+    try {
+      const schema = z.object({
+        userName: z.string().min(1, "ユーザー名を入力してください"),
+      });
+      
+      const { userName } = schema.parse(req.body);
+      
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      // ロックを解放
+      const success = await storage.releaseEditLock(req.params.id, userName);
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(403).json({ 
+          success: false, 
+          message: "ロックの解放権限がありません" 
+        });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        res.status(500).json({ message: "編集ロックの解放に失敗しました" });
+      }
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
