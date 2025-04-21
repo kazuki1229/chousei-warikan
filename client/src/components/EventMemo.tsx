@@ -60,7 +60,7 @@ function autoLinkUrls(text: string): React.ReactNode[] {
 }
 
 // メモ最終更新情報コンポーネント
-function LastEditInfo({ lastEditedBy, lastEditedAt }: { lastEditedBy: string | null, lastEditedAt: string | null }) {
+function LastEditInfo({ lastEditedBy, lastEditedAt }: { lastEditedBy: string | null | undefined, lastEditedAt: string | null | undefined }) {
   if (!lastEditedBy || !lastEditedAt) return null;
   
   const date = new Date(lastEditedAt);
@@ -103,11 +103,24 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   
   // ユーザー名の初期値をローカルストレージから取得
   useEffect(() => {
+    // イベント参加時の名前またはRecentEventsから参加者名を取得する
     const storedName = localStorage.getItem('userName');
+    const recentEvents = localStorage.getItem('recentEvents');
+    
     if (storedName) {
       setUserName(storedName);
+    } else if (recentEvents) {
+      try {
+        const events = JSON.parse(recentEvents);
+        const event = events.find((e: any) => e.id === eventId);
+        if (event && event.participantName) {
+          setUserName(event.participantName);
+        }
+      } catch (error) {
+        console.error('Failed to parse recent events:', error);
+      }
     }
-  }, []);
+  }, [eventId]);
   
   // メモデータの型を定義
   interface MemoData {
@@ -407,25 +420,16 @@ export default function EventMemo({ eventId }: EventMemoProps) {
         )}
         
         {isEditing ? (
-          <div className="space-y-4">
+          <div className="space-y-4">            
             <div>
-              <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-1">
-                お名前
-              </label>
-              <Input
-                id="userName"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="編集者の名前を入力してください"
-                className="w-full"
-                maxLength={50}
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="memo" className="block text-sm font-medium text-gray-700 mb-1">
-                メモ内容（1000文字以内）
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="memo" className="block text-sm font-medium text-gray-700">
+                  メモ内容（1000文字以内）
+                </label>
+                <div className="text-sm text-slate-500">
+                  編集者: {userName}
+                </div>
+              </div>
               <Textarea
                 ref={textareaRef}
                 id="memo"
@@ -465,8 +469,8 @@ export default function EventMemo({ eventId }: EventMemoProps) {
       {!isEditing && (
         <CardFooter className="flex justify-between border-t pt-4">
           <LastEditInfo 
-            lastEditedBy={memoData?.lastEditedBy} 
-            lastEditedAt={memoData?.lastEditedAt} 
+            lastEditedBy={memoData?.lastEditedBy || null} 
+            lastEditedAt={memoData?.lastEditedAt || null} 
           />
           
           {isLocked && lockInfo?.lockedBy === userName && (
