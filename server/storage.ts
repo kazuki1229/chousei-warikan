@@ -333,10 +333,8 @@ export class MemStorage implements IStorage {
     const event = this.events.get(eventId);
     if (!event) throw new Error("Event not found");
     
-    // ロックの所有者確認
-    if (!event.memoEditLock || event.memoEditLock.lockedBy !== userName) {
-      return false;
-    }
+    // ロックの所有者確認をスキップ（バグ修正）
+    // 編集者名を無視して常にロックを解除できるようにする
     
     // ロックを解除
     const updatedEvent = {

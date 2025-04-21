@@ -468,13 +468,10 @@ export default function EventMemo({ eventId }: EventMemoProps) {
         {isEditing ? (
           <div className="space-y-4">            
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="mb-1">
                 <label htmlFor="memo" className="block text-sm font-medium text-gray-700">
                   メモ内容（1000文字以内）
                 </label>
-                <div className="text-sm text-slate-500">
-                  編集者: {userName}
-                </div>
               </div>
               <Textarea
                 ref={textareaRef}
