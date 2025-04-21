@@ -14,12 +14,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new event
   app.post("/api/events", async (req, res) => {
     try {
-      const eventSchema = z.object({
+      // スキーマを拡張して、確定済み日程のケースにも対応
+      const eventBaseSchema = z.object({
         title: z.string().min(1, "タイトルを入力してください"),
         description: z.string().optional(),
         creatorName: z.string().min(1, "お名前を入力してください"),
         defaultStartTime: z.string().min(1, "デフォルト開始時間を入力してください"),
         defaultEndTime: z.string().min(1, "デフォルト終了時間を入力してください"),
+      });
+      
+      // 日付が決まっているケースのスキーマ
+      const confirmedDateSchema = eventBaseSchema.extend({
+        isDateConfirmed: z.literal(true),
+        selectedDate: z.string().min(1, "確定日を入力してください"),
+        startTime: z.string().min(1, "開始時間を入力してください"),
+        endTime: z.string().min(1, "終了時間を入力してください"),
+        dateOptions: z.array(z.object({
+          date: z.string(),
+          startTime: z.string(),
+          endTime: z.string(),
+          useDefaultTime: z.boolean().default(true)
+        })).min(1)
+      });
+      
+      // 通常の日程候補のスキーマ
+      const normalEventSchema = eventBaseSchema.extend({
+        isDateConfirmed: z.literal(false).optional(),
         dateOptions: z.array(z.object({
           date: z.string(), // yyyy-MM-dd format
           startTime: z.string().optional(), // HH:mm format, optional if using default
@@ -27,21 +47,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           useDefaultTime: z.boolean().default(true)
         })).min(1, "少なくとも1つの日程を選択してください"),
       });
-
+      
+      // いずれかのスキーマに一致するかチェック
+      const eventSchema = z.union([confirmedDateSchema, normalEventSchema]);
       const validatedData = eventSchema.parse(req.body);
       
       // Generate a unique ID for the event
       const eventId = nanoid();
       
       // Create event
-      const event = await storage.createEvent({
+      const eventData: any = {
         id: eventId,
         title: validatedData.title,
         description: validatedData.description || "",
         creatorName: validatedData.creatorName,
         defaultStartTime: validatedData.defaultStartTime,
         defaultEndTime: validatedData.defaultEndTime,
-      });
+      };
+      
+      // 確定済み日程の場合は、selectedDateとtimeも設定
+      if ('isDateConfirmed' in validatedData && validatedData.isDateConfirmed) {
+        eventData.selectedDate = validatedData.selectedDate;
+        eventData.startTime = validatedData.startTime;
+        eventData.endTime = validatedData.endTime;
+      }
+      
+      const event = await storage.createEvent(eventData);
       
       // Create date options
       const dateOptions = await Promise.all(

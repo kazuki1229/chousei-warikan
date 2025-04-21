@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
@@ -39,6 +40,10 @@ export default function CreateEvent() {
   const [dateOptions, setDateOptions] = useState<DateOption[]>([]);
   const [participants, setParticipants] = useState<string[]>([]);
   const [newParticipant, setNewParticipant] = useState('');
+  
+  // 日程が決まっている場合のフラグとデータ
+  const [isDateConfirmed, setIsDateConfirmed] = useState(false);
+  const [confirmedDate, setConfirmedDate] = useState<Date | undefined>(undefined);
   
   // デフォルト時間設定
   const [defaultStartTime, setDefaultStartTime] = useState('19:00');
@@ -149,22 +154,35 @@ export default function CreateEvent() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !creatorName || selectedDates.length === 0) {
+    // 入力チェック
+    if (!title || !creatorName) {
       toast({
         title: "入力エラー",
-        description: "タイトル、お名前、日程を入力してください",
+        description: "タイトルとお名前を入力してください",
         variant: "destructive"
       });
       return;
     }
     
-    // フォーマット日程オプション
-    const formattedDateOptions = dateOptions.map(option => ({
-      date: format(option.date, 'yyyy-MM-dd'),
-      startTime: option.useDefaultTime ? undefined : option.startTime,
-      endTime: option.useDefaultTime ? undefined : option.endTime,
-      useDefaultTime: option.useDefaultTime
-    }));
+    // 日程未選択チェック（確定済み日程か候補日程のいずれかが必要）
+    if (!isDateConfirmed && selectedDates.length === 0) {
+      toast({
+        title: "入力エラー",
+        description: "日程を選択してください",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // 確定済み日程の場合は確定日が選択されているかチェック
+    if (isDateConfirmed && !confirmedDate) {
+      toast({
+        title: "入力エラー",
+        description: "確定している日程を選択してください",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // 作成者を参加者リストに追加（まだリストになければ）
     let allParticipants = [...participants];
@@ -172,15 +190,41 @@ export default function CreateEvent() {
       allParticipants.unshift(creatorName);
     }
     
-    createEventMutation.mutate({
+    // APIに送信するデータを準備
+    const eventData: any = {
       title,
       description,
       creatorName,
       defaultStartTime,
       defaultEndTime,
-      dateOptions: formattedDateOptions,
       participants: allParticipants
-    });
+    };
+    
+    if (isDateConfirmed && confirmedDate) {
+      // 確定済み日程の場合
+      eventData.isDateConfirmed = true;
+      eventData.selectedDate = format(confirmedDate, 'yyyy-MM-dd');
+      eventData.startTime = defaultStartTime;
+      eventData.endTime = defaultEndTime;
+      // ダミーの日程オプションを1つだけ追加
+      eventData.dateOptions = [{
+        date: format(confirmedDate, 'yyyy-MM-dd'),
+        startTime: defaultStartTime,
+        endTime: defaultEndTime,
+        useDefaultTime: true
+      }];
+    } else {
+      // 通常の日程候補の場合
+      // フォーマット日程オプション
+      eventData.dateOptions = dateOptions.map(option => ({
+        date: format(option.date, 'yyyy-MM-dd'),
+        startTime: option.useDefaultTime ? undefined : option.startTime,
+        endTime: option.useDefaultTime ? undefined : option.endTime,
+        useDefaultTime: option.useDefaultTime
+      }));
+    }
+    
+    createEventMutation.mutate(eventData);
   };
   
   return (
@@ -280,27 +324,83 @@ export default function CreateEvent() {
         <Card>
           <CardHeader>
             <CardTitle>日程選択</CardTitle>
-            <CardDescription>候補日を選択してください（複数選択可能）</CardDescription>
+            <CardDescription>候補日を選択してください</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="bg-white rounded-md p-2 border">
-              <Calendar
-                mode="multiple"
-                selected={selectedDates}
-                onSelect={handleSelectDates as any}
-                locale={ja}
-                className="mx-auto"
+            <div className="flex items-center space-x-2 mb-4 bg-sky-50 p-4 rounded-md border border-sky-100">
+              <Checkbox 
+                id="isDateConfirmed" 
+                checked={isDateConfirmed}
+                onCheckedChange={(checked) => {
+                  setIsDateConfirmed(checked as boolean);
+                  // 切り替え時にフォームをリセット
+                  if (checked) {
+                    setSelectedDates([]);
+                    setDateOptions([]);
+                  } else {
+                    setConfirmedDate(undefined);
+                  }
+                }}
               />
+              <Label htmlFor="isDateConfirmed" className="text-base text-sky-900 font-medium">
+                日程はすでに決まっている
+              </Label>
             </div>
+            
+            {isDateConfirmed ? (
+              // 確定日程の入力フォーム
+              <div className="bg-white rounded-md p-4 border">
+                <h3 className="font-medium mb-3 text-slate-800">確定している日程</h3>
+                <p className="text-sm text-slate-600 mb-4">イベントの日程が既に決まっている場合は、こちらで確定日を設定してください。</p>
+                
+                <div className="bg-white mb-4">
+                  <Calendar
+                    mode="single"
+                    selected={confirmedDate}
+                    onSelect={(date) => setConfirmedDate(date)}
+                    locale={ja}
+                    className="mx-auto"
+                  />
+                </div>
+                
+                {confirmedDate && (
+                  <div className="bg-green-50 p-3 rounded-md border border-green-100">
+                    <p className="text-green-800 font-medium">
+                      確定日: {confirmedDate && format(confirmedDate, 'yyyy年MM月dd日(EEE)', { locale: ja })}
+                    </p>
+                    <p className="text-sm text-green-700 mt-1">
+                      時間: {defaultStartTime} - {defaultEndTime}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // 通常の候補日選択
+              <div className="bg-white rounded-md p-2 border">
+                <Calendar
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={handleSelectDates as any}
+                  locale={ja}
+                  className="mx-auto"
+                />
+              </div>
+            )}
             
             <div className="space-y-4">
               <div className="bg-slate-50 p-4 rounded-md">
                 <h3 className="font-medium mb-3 text-slate-800">デフォルト時間設定</h3>
-                <p className="text-sm text-slate-600 mb-4">すべての日程に適用される基本時間を設定します</p>
+                <p className="text-sm text-slate-600 mb-4">
+                  {isDateConfirmed 
+                    ? "確定した日程に適用される時間を設定します" 
+                    : "すべての日程候補に適用される基本時間を設定します"}
+                </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="defaultStartTime">デフォルト開始時間</Label>
+                    <Label htmlFor="defaultStartTime">
+                      {isDateConfirmed ? "開始時間" : "デフォルト開始時間"}
+                    </Label>
                     <Input 
                       id="defaultStartTime" 
                       type="time"
@@ -310,7 +410,9 @@ export default function CreateEvent() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="defaultEndTime">デフォルト終了時間</Label>
+                    <Label htmlFor="defaultEndTime">
+                      {isDateConfirmed ? "終了時間" : "デフォルト終了時間"}
+                    </Label>
                     <Input 
                       id="defaultEndTime" 
                       type="time"
@@ -322,10 +424,10 @@ export default function CreateEvent() {
                 </div>
               </div>
               
-              {selectedDates.length > 0 && (
+              {!isDateConfirmed && selectedDates.length > 0 && (
                 <div className="border rounded-md">
                   <div className="p-4 border-b bg-slate-50">
-                    <h3 className="font-medium text-slate-800">選択された日程</h3>
+                    <h3 className="font-medium text-slate-800">選択された日程候補</h3>
                   </div>
                   <div className="p-4 space-y-4">
                     {dateOptions.map((option, index) => (
