@@ -296,10 +296,7 @@ export default function EventAttendance() {
                             setParticipantId(attendance.id);
                             setParticipantName(attendance.name);
                             
-                            toast({
-                              title: "参加者を選択しました",
-                              description: `${attendance.name}さんとして登録します`,
-                            });
+                            // 参加者選択時の自動トーストメッセージを非表示
                           }}
                         >
                           {attendance.name}
@@ -318,7 +315,7 @@ export default function EventAttendance() {
               <div>
                 <h3 className="font-medium mb-2">新しい参加者として登録</h3>
                 <Button 
-                  variant="default" 
+                  variant="outline" 
                   onClick={() => setIsIdentificationOpen(true)}
                 >
                   新しい参加者として登録する
@@ -426,10 +423,7 @@ export default function EventAttendance() {
                               );
                             }
                             
-                            toast({
-                              title: "参加者を選択しました",
-                              description: `${attendance.name}さんとして回答します`,
-                            });
+                            // 参加者選択時の自動トーストメッセージを非表示
                           }}
                         >
                           {attendance.name}
@@ -448,7 +442,7 @@ export default function EventAttendance() {
               <div>
                 <h3 className="font-medium mb-2">新しい参加者として回答</h3>
                 <Button 
-                  variant="default" 
+                  variant="outline" 
                   onClick={() => setIsIdentificationOpen(true)}
                 >
                   新しい参加者として回答する
