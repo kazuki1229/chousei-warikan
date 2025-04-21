@@ -385,8 +385,11 @@ export default function ExpenseSplitting() {
                           queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/expenses`] });
                           queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/attendances`] });
                           
-                          // 参加者追加後に数秒待ってから精算情報を再取得（参加者更新を反映させるため）
+                          // 参加者追加後に数秒待ってから情報を再取得（参加者更新を反映させるため）
                           setTimeout(() => {
+                            // イベント詳細も再取得して参加者リストを更新
+                            queryClient.invalidateQueries({ queryKey: [`/api/events/${id}`] });
+                            // 精算情報を再取得
                             queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/settlements`] });
                             // 明示的に再取得
                             refetchSettlements();
