@@ -101,25 +101,38 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   // エディタの自動フォーカス用
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  // ユーザー名の初期値をローカルストレージから取得
+  // ユーザー名の初期値を設定
   useEffect(() => {
     // イベント参加時の名前またはRecentEventsから参加者名を取得する
     const storedName = localStorage.getItem('userName');
     const recentEvents = localStorage.getItem('recentEvents');
     
+    // イベント出席時に使用した名前があればそれを使用
     if (storedName) {
+      console.log("ローカルストレージから名前を取得:", storedName);
       setUserName(storedName);
-    } else if (recentEvents) {
+    } 
+    // なければイベント作成者名を使用
+    else if (recentEvents) {
       try {
         const events = JSON.parse(recentEvents);
         const event = events.find((e: any) => e.id === eventId);
         if (event && event.participantName) {
+          console.log("最近のイベントから名前を取得:", event.participantName);
           setUserName(event.participantName);
         }
       } catch (error) {
         console.error('Failed to parse recent events:', error);
       }
     }
+    
+    // デフォルト名を設定（上記で名前が設定されていない場合）
+    setTimeout(() => {
+      if (!userName) {
+        console.log("デフォルト名を設定: 匿名");
+        setUserName("匿名");
+      }
+    }, 500);
   }, [eventId]);
   
   // メモデータの型を定義
@@ -274,7 +287,17 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   
   // 編集開始処理
   const handleStartEditing = () => {
-    acquireLockMutation.mutate();
+    // ユーザー名が空の場合は匿名とする
+    if (!userName) {
+      console.log("編集開始時に匿名に設定");
+      setUserName("匿名");
+      // 少し待ってからロックを取得（名前が更新されるのを待つ）
+      setTimeout(() => {
+        acquireLockMutation.mutate();
+      }, 100);
+    } else {
+      acquireLockMutation.mutate();
+    }
   };
   
   // 編集キャンセル処理
@@ -314,6 +337,21 @@ export default function EventMemo({ eventId }: EventMemoProps) {
     
     return `${minutes}分${seconds}秒`;
   }, [lockInfo]);
+  
+  // 参加者データを取得してユーザー名リストを構築
+  const { data: attendances } = useQuery<Attendance[]>({
+    queryKey: [`/api/events/${eventId}/attendances`]
+  });
+  
+  // 参加者データが取得できたらユーザー名を設定
+  useEffect(() => {
+    if (attendances && attendances.length > 0 && !userName) {
+      // 最新の出席者名を使用 (まだuserNameが設定されていない場合)
+      const firstAttendance = attendances[0];
+      console.log("出席者データから名前を取得:", firstAttendance.name);
+      setUserName(firstAttendance.name);
+    }
+  }, [attendances, userName]);
   
   // ロックタイマーの更新
   const [lockTimeRemaining, setLockTimeRemaining] = useState<string | null>(null);
