@@ -188,6 +188,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // Cancel finalized date (revert to voting stage)
+  app.post("/api/events/:id/cancel-finalization", async (req, res) => {
+    try {
+      const schema = z.object({
+        creatorName: z.string().min(1, "作成者名が必要です"),
+      });
+      
+      const { creatorName } = schema.parse(req.body);
+      
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "イベントが見つかりません" });
+      }
+      
+      // 作成者確認（簡易認証）
+      if (event.creatorName !== creatorName) {
+        return res.status(403).json({ message: "イベント作成者のみ日程確定をキャンセルできます" });
+      }
+      
+      // selectedDateをnullに設定して確定解除
+      const updatedEvent = await storage.updateEvent(req.params.id, {
+        selectedDate: null,
+        startTime: null,
+        endTime: null,
+      });
+      
+      res.json(updatedEvent);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        res.status(500).json({ message: "日程確定のキャンセルに失敗しました" });
+      }
+    }
+  });
 
   // Get all attendances for an event
   app.get("/api/events/:id/attendances", async (req, res) => {

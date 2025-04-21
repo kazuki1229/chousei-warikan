@@ -164,6 +164,30 @@ export default function EventDetail() {
     }
   });
   
+  // 日程確定キャンセルのミューテーション
+  const cancelFinalizationMutation = useMutation({
+    mutationFn: async () => {
+      // クリエイター名を取得（ローカルストレージなどから）
+      const creatorName = event?.creatorName || '';
+      const response = await apiRequest('POST', `/api/events/${id}/cancel-finalization`, { creatorName });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${id}`] });
+      toast({
+        title: "日程確定をキャンセルしました",
+        description: "日程の再調整ができるようになりました"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "エラーが発生しました",
+        description: error.message || "日程確定のキャンセルに失敗しました",
+        variant: "destructive",
+      });
+    }
+  });
+  
   const copyUrlToClipboard = () => {
     const url = `${window.location.origin}/event/${id}/attendance`;
     navigator.clipboard.writeText(url);
@@ -290,6 +314,23 @@ export default function EventDetail() {
                       この日程でイベントが開催されます
                     </CardDescription>
                   </div>
+                  {/* 作成者の場合にキャンセルボタンを表示 */}
+                  {event.creatorName && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => cancelFinalizationMutation.mutate()}
+                      disabled={cancelFinalizationMutation.isPending}
+                      className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                    >
+                      {cancelFinalizationMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <BookmarkPlus className="h-4 w-4 mr-2" />
+                      )}
+                      確定をキャンセル
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -310,14 +351,24 @@ export default function EventDetail() {
                 <div className="flex justify-center mt-6">
                   <Button 
                     onClick={() => navigate(`/event/${id}/expenses`)}
-                    variant={event.selectedDate ? "default" : "outline"}
+                    variant="default"
                     className="w-full md:w-auto"
-                    disabled={!event.selectedDate}
                   >
                     <Calculator className="mr-2 h-4 w-4" />
                     費用精算に進む
                   </Button>
                 </div>
+                
+                {event.creatorName && (
+                  <div className="mt-4 pt-4 border-t text-sm text-slate-500 flex items-center">
+                    <div className="flex-1">
+                      <p>
+                        イベント作成者は「確定をキャンセル」ボタンをクリックすると、
+                        再び候補日から選び直すことができます。既存の参加者の回答状況は保持されます。
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
