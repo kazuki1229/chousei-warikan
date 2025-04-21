@@ -85,6 +85,52 @@ export default function CreateEvent() {
       return response.json();
     },
     onSuccess: (data) => {
+      // 自分が作成したイベントの情報をlocalStorageに保存
+      try {
+        const storedMyEvents = localStorage.getItem('myCreatedEvents');
+        let myEvents: string[] = [];
+        
+        if (storedMyEvents) {
+          myEvents = JSON.parse(storedMyEvents);
+        }
+        
+        // 既に存在するかチェック
+        if (!myEvents.includes(data.id)) {
+          myEvents.push(data.id);
+          localStorage.setItem('myCreatedEvents', JSON.stringify(myEvents));
+        }
+        
+        // 参加イベントにも追加
+        const storedRecentEvents = localStorage.getItem('recentEvents');
+        let recentEvents: {id: string, title: string}[] = [];
+        
+        if (storedRecentEvents) {
+          recentEvents = JSON.parse(storedRecentEvents);
+        }
+        
+        // 既に存在する場合は削除（後で先頭に追加するため）
+        const existingIndex = recentEvents.findIndex(e => e.id === data.id);
+        if (existingIndex !== -1) {
+          recentEvents.splice(existingIndex, 1);
+        }
+        
+        // 先頭に追加
+        recentEvents.unshift({
+          id: data.id,
+          title: data.title || title
+        });
+        
+        // 最大10件まで保持
+        if (recentEvents.length > 10) {
+          recentEvents = recentEvents.slice(0, 10);
+        }
+        
+        // 保存
+        localStorage.setItem('recentEvents', JSON.stringify(recentEvents));
+      } catch (error) {
+        console.error('Failed to save event to localStorage:', error);
+      }
+      
       toast({
         title: "予定を作成しました",
         description: "参加者に共有するためのリンクが生成されました",

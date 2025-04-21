@@ -12,18 +12,27 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, CalendarClock, Loader2, History, Star, Trash2 } from 'lucide-react';
 import { Event } from '@shared/schema';
 import { formatDate } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
-  const { data: events, isLoading } = useQuery<Event[]>({
+  const { data: allEvents, isLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
   });
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
+  // 自分が作成したイベントIDリスト
+  const [myEventIds, setMyEventIds] = useState<string[]>([]);
+  
   // ローカルストレージから参加済みイベントの履歴を取得
   const [recentEvents, setRecentEvents] = useState<{id: string, title: string}[]>([]);
+  
+  // 自分が作成したイベントのみをフィルタリング
+  const myEvents = useMemo(() => {
+    if (!allEvents || !myEventIds.length) return [];
+    return allEvents.filter(event => myEventIds.includes(event.id));
+  }, [allEvents, myEventIds]);
   
   // イベント履歴から項目を削除する関数
   const removeFromHistory = (eventId: string, e: React.MouseEvent) => {
@@ -56,6 +65,32 @@ export default function Home() {
     }
   };
   
+  // 自分が作成したイベントを削除する関数
+  const removeMyEvent = (eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // イベントの伝播を停止（カードのクリックイベントを発火させない）
+    
+    try {
+      // 現在の自作イベントリストを取得
+      const updatedEventIds = myEventIds.filter(id => id !== eventId);
+      
+      // 更新した配列を保存
+      localStorage.setItem('myCreatedEvents', JSON.stringify(updatedEventIds));
+      setMyEventIds(updatedEventIds);
+      
+      toast({
+        title: "マイイベントから削除しました",
+        description: "イベントがマイイベントリストから削除されました",
+      });
+    } catch (error) {
+      console.error('Failed to remove event from my events:', error);
+      toast({
+        title: "エラーが発生しました",
+        description: "削除処理に失敗しました",
+        variant: "destructive"
+      });
+    }
+  };
+  
   useEffect(() => {
     // ローカルストレージからユーザーが参加した最近のイベントを取得
     try {
@@ -63,8 +98,14 @@ export default function Home() {
       if (storedEvents) {
         setRecentEvents(JSON.parse(storedEvents));
       }
+      
+      // 自分が作成したイベントのIDリストを取得
+      const storedMyEvents = localStorage.getItem('myCreatedEvents');
+      if (storedMyEvents) {
+        setMyEventIds(JSON.parse(storedMyEvents));
+      }
     } catch (error) {
-      console.error('Failed to load recent events from localStorage:', error);
+      console.error('Failed to load data from localStorage:', error);
     }
   }, []);
 
@@ -119,9 +160,9 @@ export default function Home() {
         </div>
       )}
       
-      {/* すべてのイベント */}
+      {/* 自分のイベント */}
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-medium text-slate-800">すべてのイベント</h2>
+        <h2 className="text-lg font-medium text-slate-800">自分が作成したイベント</h2>
       </div>
       <div className="space-y-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3 sm:space-y-0">
         {isLoading ? (
@@ -130,8 +171,8 @@ export default function Home() {
               <Loader2 className="h-6 w-6 animate-spin text-primary/70" />
             </div>
           </div>
-        ) : events && events.length > 0 ? (
-          events.map((event) => (
+        ) : myEvents && myEvents.length > 0 ? (
+          myEvents.map((event) => (
             <div 
               key={event.id} 
               onClick={() => navigate(`/event/${event.id}`)}
@@ -146,7 +187,16 @@ export default function Home() {
                         作成者: {event.creatorName}
                       </p>
                     </div>
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${event.selectedDate ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${event.selectedDate ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                      <button 
+                        onClick={(e) => removeMyEvent(event.id, e)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        aria-label="削除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="card-content-mobile">
