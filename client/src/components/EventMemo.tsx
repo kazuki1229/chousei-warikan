@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Edit, Save, Clock, User, AlertCircle, LockIcon, UnlockIcon, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { Attendance } from '../../../shared/schema';
 
 // リンクの検出用正規表現
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -174,15 +175,15 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   // 編集ロック取得ミューテーション
   const acquireLockMutation = useMutation({
     mutationFn: async () => {
-      if (!userName.trim()) {
-        throw new Error('名前を入力してください');
-      }
+      // ユーザー名が空の場合は「匿名」を設定
+      const effectiveUserName = userName.trim() || '匿名';
       
       // ユーザー名をローカルストレージに保存
-      localStorage.setItem('userName', userName);
+      localStorage.setItem('userName', effectiveUserName);
+      setUserName(effectiveUserName);
       
       const response = await apiRequest('POST', `/api/events/${eventId}/memo/lock`, { 
-        userName: userName.trim() 
+        userName: effectiveUserName
       });
       return response.json();
     },
@@ -223,8 +224,11 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   // 編集ロック解放ミューテーション
   const releaseLockMutation = useMutation({
     mutationFn: async () => {
+      // ユーザー名が空の場合は自動的に「匿名」を使用
+      const effectiveUserName = userName.trim() || '匿名';
+      
       const response = await apiRequest('POST', `/api/events/${eventId}/memo/unlock`, { 
-        userName: userName.trim() 
+        userName: effectiveUserName
       });
       return response.json();
     },
@@ -258,9 +262,12 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   const saveMemoMutation = useMutation({
     mutationFn: async () => {
       setIsSaving(true);
+      // ユーザー名が空の場合は「匿名」を使用
+      const effectiveUserName = userName.trim() || '匿名';
+      
       const response = await apiRequest('POST', `/api/events/${eventId}/memo`, { 
         memo: memo.trim(), 
-        editorName: userName.trim() 
+        editorName: effectiveUserName
       });
       return response.json();
     },
@@ -312,15 +319,16 @@ export default function EventMemo({ eventId }: EventMemoProps) {
   
   // 保存処理
   const handleSave = () => {
+    // 名前がなければ匿名を設定
     if (!userName.trim()) {
-      toast({
-        title: "名前を入力してください",
-        variant: "destructive",
-      });
-      return;
+      setUserName('匿名');
+      // 名前を設定してから少し待ってから保存
+      setTimeout(() => {
+        saveMemoMutation.mutate();
+      }, 100);
+    } else {
+      saveMemoMutation.mutate();
     }
-    
-    saveMemoMutation.mutate();
   };
   
   // ロックタイマーの表示用
